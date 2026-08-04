@@ -1,6 +1,6 @@
 {
   "name": "com.natteens.dialect",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "displayName": "Dialect",
   "description": "A modular, graph-based dialogue framework for Unity with full localization support and editor integration.",
   "keywords": [

@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/Natteens/dialect/compare/v0.2.0...v0.2.1) (2026-08-04)
+
+
+### Bug Fixes
+
+* **package:** remove obsolete Graph Toolkit dependency ([2463344](https://github.com/Natteens/dialect/commit/2463344bf6032cf029e9da03a6b9c5b06107d03b))
+
 # [0.2.0](https://github.com/Natteens/dialect/compare/v0.1.2...v0.2.0) (2026-06-17)
 
 
