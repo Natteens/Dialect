@@ -1,3 +1,10 @@
+## [0.2.2](https://github.com/Natteens/Dialect/compare/v0.2.1...v0.2.2) (2026-09-02)
+
+
+### Bug Fixes
+
+* support Graph Toolkit across Unity 6 ([a804bf9](https://github.com/Natteens/Dialect/commit/a804bf9d67e93995ef0e790770db961bd12deac1))
+
 ## [0.2.1](https://github.com/Natteens/dialect/compare/v0.2.0...v0.2.1) (2026-08-04)
 
 
