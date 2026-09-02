@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Dialect.Core;
 using Dialect.Editor.Nodes;
+using Dialect.Editor.Utils;
 using Unity.GraphToolkit.Editor;
 using UnityEditor.AssetImporters;
 using UnityEngine;
@@ -62,13 +63,13 @@ namespace Dialect.Editor.AssetImport
                     continue;
                 }
                 
-                for (int i = 0; i < currentNode.OutputPortCount; i++)
+                for (int i = 0; i < NodeUtility.GetOutputPortCount(currentNode); i++)
                 {
                     var port = currentNode.GetOutputPort(i);
 
-                    if (port.IsConnected)
+                    if (NodeUtility.IsPortConnected(port))
                     {
-                        nodesToProcess.Enqueue(port.FirstConnectedPort.GetNode());
+                        nodesToProcess.Enqueue(NodeUtility.GetFirstConnectedPort(port).GetNode());
                     }
                 }
             }
@@ -82,11 +83,11 @@ namespace Dialect.Editor.AssetImport
                 var runtimeIndex = kvp.Value;
                 var runtimeNode = runtimeGraph.nodes[runtimeIndex];
 
-                for (int i = 0; i < editorNode.OutputPortCount; i++)
+                for (int i = 0; i < NodeUtility.GetOutputPortCount(editorNode); i++)
                 {
                     var port = editorNode.GetOutputPort(i);
 
-                    if (port.IsConnected && nodeMap.TryGetValue(port.FirstConnectedPort.GetNode(), out int nextIndex))
+                    if (NodeUtility.IsPortConnected(port) && nodeMap.TryGetValue(NodeUtility.GetFirstConnectedPort(port).GetNode(), out int nextIndex))
                     {
                         runtimeNode.nextNodeIndices.Add(nextIndex);
                     }
