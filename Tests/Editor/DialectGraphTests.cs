@@ -1,4 +1,5 @@
 using System.Linq;
+using Dialect.Core;
 using Dialect.Editor;
 using Dialect.Editor.Nodes;
 using NUnit.Framework;
@@ -21,6 +22,11 @@ namespace Dialect.Tests.Editor
             var start = graph.GetNodes().OfType<StartNode>().Single();
             Assert.That(graph.GetNodes().OfType<EndNode>().Count(), Is.EqualTo(1));
             Assert.That(start.GetOutputPortByName(DialectNode.FlowOutput).IsConnected, Is.True);
+
+            AssetDatabase.ImportAsset(TestPath, ImportAssetOptions.ForceSynchronousImport);
+            var runtime = AssetDatabase.LoadAssetAtPath<DialectRuntimeGraph>(TestPath);
+            Assert.That(runtime, Is.Not.Null);
+            Assert.That(runtime.IsValid, Is.True, string.Join("\n", runtime.Diagnostics));
         }
     }
 }

@@ -10,7 +10,7 @@ using Dialect.Editor;
 
 namespace Dialect.ExternalTests
 {
-    [Serializable, Node("External Tests", null, "External Node")]
+    [Serializable, Node("External Tests", null, "External Node"), UseWithGraph(typeof(DialectGraph))]
     public sealed class ExternalNode : DialectNode, IDialectNodeCompiler
     {
         protected override void OnDefinePorts(IPortDefinitionContext context)
@@ -23,7 +23,7 @@ namespace Dialect.ExternalTests
     [Serializable]
     public sealed class ExternalRuntimeNode : RuntimeNode
     {
-        int next;
+        [SerializeField] int next;
         public ExternalRuntimeNode(int next) => this.next = next;
         public override DialectExecutionResult Execute(DialectExecutionContext context) => DialectExecutionResult.ContinueTo(next);
     }

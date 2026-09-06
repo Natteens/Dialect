@@ -4,7 +4,6 @@ using System.Linq;
 using Dialect.Blackboards;
 using Dialect.Editor.Nodes;
 using Unity.GraphToolkit.Editor;
-using UnityEditor;
 using UnityEngine;
 
 namespace Dialect.Editor
@@ -15,14 +14,6 @@ namespace Dialect.Editor
         public const string AssetExtension = "dlg";
         [SerializeField] List<DialectBlackboard> blackboards = new();
         public IReadOnlyList<DialectBlackboard> Blackboards => blackboards;
-
-        [MenuItem("Assets/Create/Dialect/Dialogue Graph")]
-        static void CreateAssetFile()
-        {
-            var path = EditorUtility.SaveFilePanelInProject("Create Dialogue Graph", "Dialogue Graph", AssetExtension,
-                "Choose where to save the dialogue graph.");
-            if (!string.IsNullOrEmpty(path)) CreateInitialized(path);
-        }
 
         public override void OnEnable()
         {
