@@ -1,3 +1,10 @@
+# [0.4.0](https://github.com/Natteens/Dialect/compare/v0.3.1...v0.4.0) (2026-09-06)
+
+
+### Features
+
+* complete Dialect authoring and debugging toolkit ([d64ffc0](https://github.com/Natteens/Dialect/commit/d64ffc01f30256b642ee8612d05f81c0e4b643c3))
+
 ## [0.3.1](https://github.com/Natteens/Dialect/compare/v0.3.0...v0.3.1) (2026-09-06)
 
 
