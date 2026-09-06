@@ -1,3 +1,10 @@
+## [0.3.1](https://github.com/Natteens/Dialect/compare/v0.3.0...v0.3.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* create and import dialogue graphs reliably ([993a990](https://github.com/Natteens/Dialect/commit/993a990282a136af824e99ce6849a2291f4b5f3b))
+
 # [0.3.0](https://github.com/Natteens/Dialect/compare/v0.2.2...v0.3.0) (2026-09-06)
 
 
