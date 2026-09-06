@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/Natteens/Dialect/compare/v0.2.2...v0.3.0) (2026-09-06)
+
+
+### Features
+
+* modernize Dialect for Unity 6.6 ([dd22c72](https://github.com/Natteens/Dialect/commit/dd22c7295442c1c6109bc048e486eb62fd62f14d))
+
 ## [0.2.2](https://github.com/Natteens/Dialect/compare/v0.2.1...v0.2.2) (2026-09-02)
 
 

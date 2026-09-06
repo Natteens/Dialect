@@ -1,6 +1,6 @@
 {
   "name": "com.natteens.dialect",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "displayName": "Dialect",
   "description": "A typed, extensible dialogue graph runtime and authoring toolkit for Unity 6.6.",
   "keywords": [
@@ -21,9 +21,11 @@
   "dependencies": {
     "com.unity.localization": "1.5.9"
   },
-  "samples": [{
-    "displayName": "Runtime UI",
-    "description": "A minimal typed UI adapter for DialectDirector.",
-    "path": "Samples~/RuntimeUI"
-  }]
+  "samples": [
+    {
+      "displayName": "Runtime UI",
+      "description": "A minimal typed UI adapter for DialectDirector.",
+      "path": "Samples~/RuntimeUI"
+    }
+  ]
 }
