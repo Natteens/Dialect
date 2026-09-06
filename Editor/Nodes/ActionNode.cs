@@ -1,32 +1,33 @@
 using System;
 using Dialect.Actions;
 using Dialect.Core;
-using Dialect.Editor.Utils;
 using Dialect.Nodes;
+using Unity.GraphToolkit.Editor;
 
 namespace Dialect.Editor.Nodes
 {
     [Serializable]
-    internal class ActionNode : BaseNode, IConvertibleToRuntime
+    [Node("Dialogue/Logic", null, "Action")]
+    public sealed class ActionNode : DialectNode, IDialectNodeCompiler
     {
         const string ACTION_PORT = "action";
 
         protected override void OnDefinePorts(IPortDefinitionContext context)
         {
-            AddInputContextPort(context, EXECUTION_PORT_DEFAULT_NAME, INPUT_DISPLAY_NAME);
-            AddInputContextPort<DialectAction>(context, ACTION_PORT, "Action");
-            AddOutputContextPort(context, EXECUTION_PORT_DEFAULT_NAME, OUTPUT_DISPLAY_NAME);
+            DefaultColor = new UnityEngine.Color(.3f, .62f, .36f);
+            Subtitle = "Game action";
+            AddFlowInput(context);
+            AddValueInput<DialectAction>(context, ACTION_PORT, "Action");
+            AddFlowOutput(context);
         }
 
-        public RuntimeNode CreateRuntimeNode()
+        public RuntimeNode Compile(DialectNodeCompilationContext context) =>
+            new ActionRuntimeNode(context.Read<DialectAction>(ACTION_PORT), context.Target(FlowOutput));
+        public void Validate(DialectNodeValidationContext context)
         {
-            var actionPort = GetInputPortByName(ACTION_PORT);
-            var action = NodeUtility.GetInputPortValue<DialectAction>(actionPort);
-            
-            return new ActionRuntimeNode
-            {
-                action = action
-            };
+            if (context.Read<DialectAction>(ACTION_PORT) == null) context.Error("Assign an action.");
+            if (!context.IsConnected(FlowOutput)) context.Error("Action must continue to another node.");
         }
+        public bool WaitsForInput => false;
     }
 }

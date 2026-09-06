@@ -1,45 +1,65 @@
 using System;
+using System.Collections.Generic;
+using Dialect.Core;
+using Dialect.Editor.Utils;
 using Unity.GraphToolkit.Editor;
 
 namespace Dialect.Editor.Nodes
 {
     [Serializable]
-    internal abstract class BaseNode : Node
+    public abstract class DialectNode : Node
     {
-        public const string EXECUTION_PORT_DEFAULT_NAME = "ExecutionPort";
-        public const string INPUT_DISPLAY_NAME = "In";
-        public const string OUTPUT_DISPLAY_NAME = "Out";
-        
-        public void AddInputContextPort<T>(IPortDefinitionContext ctx, string portName = null, string displayName = null)
+        public const string FlowInput = "flowIn";
+        public const string FlowOutput = "flowOut";
+        protected static void AddFlowInput(IPortDefinitionContext context, string name = FlowInput, string label = "In") =>
+            context.AddInputPort(name).WithDisplayName(label).WithConnectorUI(PortConnectorUI.Arrowhead)
+                .WithCapacity(PortCapacity.Multi).Build();
+        protected static void AddFlowOutput(IPortDefinitionContext context, string name = FlowOutput, string label = "Out") =>
+            context.AddOutputPort(name).WithDisplayName(label).WithConnectorUI(PortConnectorUI.Arrowhead)
+                .WithCapacity(PortCapacity.Single).Build();
+        protected static void AddValueInput<T>(IPortDefinitionContext context, string name, string label) =>
+            context.AddInputPort<T>(name).WithDisplayName(label).WithConnectorUI(PortConnectorUI.Circle)
+                .WithCapacity(PortCapacity.Single).Build();
+    }
+
+    public interface IDialectNodeCompiler
+    {
+        RuntimeNode Compile(DialectNodeCompilationContext context);
+        void Validate(DialectNodeValidationContext context);
+        bool WaitsForInput { get; }
+    }
+
+    public sealed class DialectNodeCompilationContext
+    {
+        readonly IReadOnlyDictionary<INode, int> indices;
+        readonly List<string> diagnostics;
+        internal DialectNodeCompilationContext(DialectNode node, IReadOnlyDictionary<INode, int> indices,
+            List<string> diagnostics) { Node = node; this.indices = indices; this.diagnostics = diagnostics; }
+        public DialectNode Node { get; }
+        public T Read<T>(string portName) => NodeUtility.GetInputPortValue<T>(Node.GetInputPortByName(portName));
+        public int Target(string portName, bool required = true)
         {
-            ctx.AddInputPort<T>(portName)
-                .WithDisplayName(displayName)
-                .WithConnectorUI(PortConnectorUI.Circle)
-                .Build();
+            var port = Node.GetOutputPortByName(portName);
+            if (port != null && port.IsConnected && port.FirstConnectedPort != null &&
+                indices.TryGetValue(port.FirstConnectedPort.GetNode(), out var index)) return index;
+            if (required) Error($"Required output '{portName}' is not connected.");
+            return -1;
         }
-        
-        public void AddOutputContextPort<T>(IPortDefinitionContext ctx, string portName = null, string displayName = null)
+        public void Error(string message) => diagnostics.Add($"{Node.Title}: {message}");
+    }
+
+    public sealed class DialectNodeValidationContext
+    {
+        readonly GraphLogger logger;
+        internal DialectNodeValidationContext(DialectNode node, GraphLogger logger) { Node = node; this.logger = logger; }
+        public DialectNode Node { get; }
+        public bool IsConnected(string portName)
         {
-            ctx.AddOutputPort<T>(portName)
-                .WithDisplayName(displayName)
-                .WithConnectorUI(PortConnectorUI.Arrowhead)
-                .Build();
+            var port = Node.GetInputPortByName(portName) ?? Node.GetOutputPortByName(portName);
+            return port != null && port.IsConnected;
         }
-        
-        public void AddInputContextPort(IPortDefinitionContext ctx, string portName = null, string displayName = null)
-        {
-            ctx.AddInputPort(portName)
-                .WithDisplayName(displayName)
-                .WithConnectorUI(PortConnectorUI.Circle)
-                .Build();
-        }
-        
-        public void AddOutputContextPort(IPortDefinitionContext ctx,string portName = null, string displayName = null)
-        {
-            ctx.AddOutputPort(portName)
-                .WithDisplayName(displayName)
-                .WithConnectorUI(PortConnectorUI.Arrowhead)
-                .Build();
-        }
+        public T Read<T>(string portName) => NodeUtility.GetInputPortValue<T>(Node.GetInputPortByName(portName));
+        public void Error(string message) => logger.LogError(message, Node);
+        public void Warning(string message) => logger.LogWarning(message, Node);
     }
 }

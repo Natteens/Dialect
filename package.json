@@ -2,23 +2,28 @@
   "name": "com.natteens.dialect",
   "version": "0.2.2",
   "displayName": "Dialect",
-  "description": "A modular, graph-based dialogue framework for Unity with full localization support and editor integration.",
+  "description": "A typed, extensible dialogue graph runtime and authoring toolkit for Unity 6.6.",
   "keywords": [
     "Unity",
-    "GameDev",
-    "Dialect"
+    "dialogue",
+    "graph",
+    "localization"
   ],
   "author": {
     "name": "Natteens",
     "url": "https://github.com/Natteens",
     "email": "natteens.social@gmail.com"
   },
-  "unity": "6000.0",
+  "unity": "6000.6",
   "documentationUrl": "https://github.com/Natteens/dialect",
   "changelogUrl": "https://github.com/Natteens/dialect/blob/main/CHANGELOG.md",
   "licensesUrl": "https://github.com/Natteens/dialect/blob/main/LICENSE.md",
   "dependencies": {
-    "com.unity.graphtoolkit": "0.4.0-exp.2",
     "com.unity.localization": "1.5.9"
-  }
+  },
+  "samples": [{
+    "displayName": "Runtime UI",
+    "description": "A minimal typed UI adapter for DialectDirector.",
+    "path": "Samples~/RuntimeUI"
+  }]
 }

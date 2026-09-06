@@ -1,0 +1,10 @@
+{
+  "name": "Dialect.ExternalNode.Tests",
+  "rootNamespace": "Dialect.ExternalTests",
+  "references": ["Dialect", "Dialect.Editor", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "includePlatforms": ["Editor"],
+  "overrideReferences": true,
+  "precompiledReferences": ["nunit.framework.dll"],
+  "autoReferenced": false,
+  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+}

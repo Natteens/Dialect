@@ -1,16 +1,20 @@
 using System;
-using System.Collections.Generic;
 using Dialect.Executors;
+using UnityEngine;
 
 namespace Dialect.Core
 {
     [Serializable]
     public abstract class RuntimeNode
     {
-        public List<int> nextNodeIndices = new();
-        
-        public abstract void Execute(DialectExecutionContext context);
-        
-        public abstract bool ShouldAutoAdvance();
+        [SerializeField] string authoringId;
+
+        public string AuthoringId => authoringId;
+
+        public abstract DialectExecutionResult Execute(DialectExecutionContext context);
+
+        public virtual bool RefreshPresentation(DialectExecutionContext context) => false;
+
+        public void SetAuthoringId(string value) => authoringId = value;
     }
 }

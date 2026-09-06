@@ -2,97 +2,67 @@ using System.Collections.Generic;
 using System.Linq;
 using Dialect.Core;
 using Dialect.Editor.Nodes;
-using Dialect.Editor.Utils;
 using Unity.GraphToolkit.Editor;
 using UnityEditor.AssetImporters;
 using UnityEngine;
 
 namespace Dialect.Editor.AssetImport
 {
-    [ScriptedImporter(1, DialectDirectorGraph.AssetExtension)]
-    internal class DialectDirectorImporter : ScriptedImporter
+    [ScriptedImporter(2, DialectGraph.AssetExtension)]
+    public sealed class DialectGraphImporter : ScriptedImporter
     {
-        public override void OnImportAsset(AssetImportContext ctx)
+        public override void OnImportAsset(AssetImportContext context)
         {
-            var graph = GraphDatabase.LoadGraphForImporter<DialectDirectorGraph>(ctx.assetPath);
-            
+            var runtime = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
+            runtime.name = System.IO.Path.GetFileNameWithoutExtension(context.assetPath);
+            var diagnostics = new List<string>();
+            var graph = GraphDatabase.LoadGraphForImporter<DialectGraph>(context.assetPath);
             if (graph == null)
             {
-                Debug.LogError($"Failed to load Dialect Director graph asset: {ctx.assetPath}");
+                diagnostics.Add("The authoring graph could not be loaded.");
+                runtime.Configure(context.assetPath, -1, new List<RuntimeNode>(), null, diagnostics);
+                AddRuntime(context, runtime);
                 return;
             }
-            
-            var startNodeModel = graph.GetNodes().OfType<StartNode>().FirstOrDefault();
-            
-            if (startNodeModel == null)
+
+            var authoringNodes = graph.GetNodes().OfType<DialectNode>().ToList();
+            var indices = new Dictionary<INode, int>();
+            for (var i = 0; i < authoringNodes.Count; i++) indices[authoringNodes[i]] = i;
+            var compiled = new List<RuntimeNode>(authoringNodes.Count);
+            foreach (var node in authoringNodes)
             {
-                Debug.LogError($"No start node found in graph: {ctx.assetPath}");
-                return;
+                RuntimeNode runtimeNode = null;
+                if (node is IDialectNodeCompiler compiler)
+                {
+                    try { runtimeNode = compiler.Compile(new DialectNodeCompilationContext(node, indices, diagnostics)); }
+                    catch (System.Exception exception) { diagnostics.Add($"{node.Title}: {exception.Message}"); }
+                }
+                else diagnostics.Add($"{node.Title}: missing IDialectNodeCompiler implementation.");
+                runtimeNode ??= new InvalidRuntimeNode($"{node.Title} could not be compiled.");
+                runtimeNode.SetAuthoringId(node.ID.ToString());
+                compiled.Add(runtimeNode);
             }
-            
-            var runtimeAsset = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
-            var nodeMap = new Dictionary<INode, int>();
-            
-            CreateRuntimeNodes(startNodeModel, runtimeAsset, nodeMap);
-            SetupConnections(startNodeModel, runtimeAsset, nodeMap);
-            
-            ctx.AddObjectToAsset("RuntimeAsset", runtimeAsset);
-            ctx.SetMainObject(runtimeAsset);
+
+            var starts = authoringNodes.OfType<StartNode>().ToList();
+            if (starts.Count != 1) diagnostics.Add($"Expected exactly one Start node, found {starts.Count}.");
+            var entry = starts.Count == 1 ? indices[starts[0]] : -1;
+            runtime.Configure(graph.AssetGuid.ToString(), entry, compiled, graph.Blackboards.ToList(), diagnostics);
+            AddRuntime(context, runtime);
         }
 
-        void CreateRuntimeNodes(INode startNode, DialectRuntimeGraph runtimeGraph, Dictionary<INode, int> nodeMap)
+        static void AddRuntime(AssetImportContext context, DialectRuntimeGraph runtime)
         {
-            var nodesToProcess = new Queue<INode>();
-            nodesToProcess.Enqueue(startNode);
-
-            while (nodesToProcess.Count > 0)
-            {
-                var currentNode = nodesToProcess.Dequeue();
-                
-                if (nodeMap.ContainsKey(currentNode)) continue;
-                
-                if (currentNode is IConvertibleToRuntime convertible)
-                {
-                    var runtimeNode = convertible.CreateRuntimeNode();
-                    nodeMap[currentNode] = runtimeGraph.nodes.Count;
-                    runtimeGraph.nodes.Add(runtimeNode);
-                }
-                else
-                {
-                    Debug.LogWarning($"Node {currentNode.GetType().Name} does not implement IConvertibleToRuntime. Skipping.");
-                    continue;
-                }
-                
-                for (int i = 0; i < NodeUtility.GetOutputPortCount(currentNode); i++)
-                {
-                    var port = currentNode.GetOutputPort(i);
-
-                    if (NodeUtility.IsPortConnected(port))
-                    {
-                        nodesToProcess.Enqueue(NodeUtility.GetFirstConnectedPort(port).GetNode());
-                    }
-                }
-            }
+            context.AddObjectToAsset("RuntimeGraph", runtime);
+            context.SetMainObject(runtime);
         }
+    }
 
-        void SetupConnections(INode startNode, DialectRuntimeGraph runtimeGraph, Dictionary<INode, int> nodeMap)
-        {
-            foreach (var kvp in nodeMap)
-            {
-                var editorNode = kvp.Key;
-                var runtimeIndex = kvp.Value;
-                var runtimeNode = runtimeGraph.nodes[runtimeIndex];
-
-                for (int i = 0; i < NodeUtility.GetOutputPortCount(editorNode); i++)
-                {
-                    var port = editorNode.GetOutputPort(i);
-
-                    if (NodeUtility.IsPortConnected(port) && nodeMap.TryGetValue(NodeUtility.GetFirstConnectedPort(port).GetNode(), out int nextIndex))
-                    {
-                        runtimeNode.nextNodeIndices.Add(nextIndex);
-                    }
-                }
-            }
-        }
+    [System.Serializable]
+    sealed class InvalidRuntimeNode : RuntimeNode
+    {
+        [SerializeField] string message;
+        public InvalidRuntimeNode(string message) => this.message = message;
+        public override DialectExecutionResult Execute(Executors.DialectExecutionContext context) =>
+            throw new System.InvalidOperationException(message);
     }
 }

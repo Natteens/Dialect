@@ -1,17 +1,36 @@
-using System;
+using Dialect.Blackboards;
 using Dialect.Core;
-using Dialect.Nodes;
-using UnityEngine;
 
 namespace Dialect.Executors
 {
-    public class DialectExecutionContext
+    public sealed class DialectExecutionContext
     {
-        public DialectDirector director;
-        public Action<string, string> onDialogueShown;
-        public Action<string[]> onChoiceShown;
-        public Action onDialogueEnded;
-        public object customData;
-        public bool lastConditionResult;
+        internal DialectExecutionContext(DialectDirector director, DialectRuntimeGraph graph,
+            DialectSession session, DialectVariableStore variables, object userData)
+        {
+            Director = director;
+            Graph = graph;
+            Session = session;
+            Variables = variables;
+            UserData = userData;
+        }
+
+        public DialectDirector Director { get; }
+        public DialectRuntimeGraph Graph { get; }
+        public DialectSession Session { get; }
+        public DialectVariableStore Variables { get; }
+        public object UserData { get; }
+
+        public bool TryGetUserData<T>(out T value)
+        {
+            if (UserData is T typed)
+            {
+                value = typed;
+                return true;
+            }
+
+            value = default;
+            return false;
+        }
     }
 }

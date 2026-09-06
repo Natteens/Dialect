@@ -1,86 +1,59 @@
-<div align="center">
-
 # Dialect
 
-**Write the conversation as a graph. Keep the presentation in your game.**
+Dialect is a typed dialogue graph runtime and authoring toolkit for Unity 6.6. It keeps the graph focused on narrative flow while letting game code own presentation, input, actions, conditions, and save data.
 
-A Unity dialogue package that combines visual authoring, runtime events and Localization without
-locking the project into a predefined dialogue UI.
+## Requirements
 
-[![Release](https://img.shields.io/github/v/release/Natteens/dialect?sort=semver&label=release&style=flat-square)](https://github.com/Natteens/dialect/releases)
-[![Unity](https://img.shields.io/badge/Unity-6000.0%2B-000000?style=flat-square&logo=unity)](https://unity.com)
-[![Localization](https://img.shields.io/badge/Localization-1.5.9%2B-555555?style=flat-square)](https://docs.unity3d.com/Packages/com.unity.localization@1.5/manual/index.html)
-[![License](https://img.shields.io/github/license/Natteens/dialect?style=flat-square)](./LICENSE.md)
+- Unity 6000.6 or newer
+- Unity Localization 1.5.9 or newer
 
-[Why Dialect?](#authoring-and-presentation-stay-separate) · [Installation](#installation) · [Workflow](#basic-workflow) · [Documentation](#documentation)
+Graph Toolkit ships as a Unity module in 6000.6, so Dialect does not declare the obsolete experimental package.
 
-</div>
+## Install
 
----
+Add the Git URL through Package Manager:
 
-## Authoring and Presentation Stay Separate
-
-A dialogue graph should describe the conversation: what is said, which choices are available, what
-conditions must pass and where the flow continues. It should not decide how a particular game draws
-a portrait, animates a textbox or handles input.
-
-Dialect keeps that boundary explicit. Conversations are authored visually and imported into a
-runtime representation. `DialectDirector` executes the flow and reports what happened through
-events, leaving the project free to present dialogue in its own style.
-
-<table>
-<tr>
-<td width="50%"><strong>Visual conversation flow</strong><br><sub>Dialogue, choices, conditions, actions and endings remain readable as connected authoring nodes.</sub></td>
-<td width="50%"><strong>Project-owned UI</strong><br><sub>Runtime events provide the content; the game decides how that content looks and behaves.</sub></td>
-</tr>
-<tr>
-<td width="50%"><strong>Localization-ready</strong><br><sub>Dialogue content integrates with the Unity Localization package instead of inventing a parallel text system.</sub></td>
-<td width="50%"><strong>Extensible behavior</strong><br><sub>Conditions and actions connect conversation flow to project-specific state without hard-coding it into the editor.</sub></td>
-</tr>
-</table>
-
-## Installation
-
-Requires Unity **6000.0** or newer. The Localization dependency is declared by the package. Graph
-authoring is provided by the Unity Editor and does not require a separate Graph Toolkit entry in
-`package.json`.
-
-In the Package Manager, choose **Add package from git URL** and paste:
-
-```text
-https://github.com/Natteens/dialect.git
+```
+https://github.com/Natteens/Dialect.git
 ```
 
-Or declare it in `Packages/manifest.json`:
+## First dialogue
 
-```json
-{
-  "dependencies": {
-    "com.natteens.dialect": "https://github.com/Natteens/dialect.git"
-  }
-}
+1. Create a graph with **Assets > Create > Dialect > Dialogue Graph**. A connected Start and End are created automatically.
+2. Add Dialogue, Choice, Condition, or Action nodes from the graph library.
+3. Add `DialectDirector` to a scene object and assign the imported `.dlg` runtime asset as its default graph.
+4. Subscribe to typed events and call `Advance` or `Choose` from your UI.
+
+```csharp
+director.LinePresented += line => view.Show(line.Speaker, line.Text);
+director.ChoicesPresented += choices => view.Show(choices.Choices);
+director.SessionEnded += (_, reason) => view.Hide();
+
+director.Play(greetingGraph, playerContext);
+director.Advance();
+director.Choose(0);
 ```
 
-Pin the dependency to a release tag for reproducible installs.
+One director can play any number of graph assets. `TryPlay` returns false for an invalid graph; `Play` reports invalid requests with an exception. Starting another graph interrupts the active session explicitly.
 
-## Basic Workflow
+## Runtime model
 
-1. Create a Dialect graph asset.
-2. Build the conversation from dialogue, choice and control-flow nodes.
-3. Save the graph so its runtime data is imported.
-4. Assign the result to a `DialectDirector`.
-5. Connect the director events to the project's dialogue presentation.
+`DialectSession` owns the current graph, node, playback state, termination reason, user data, choices, and a per-session variable overlay. The director executes automatic nodes in an iterative pump with a configurable runaway guard. Runtime assets and blackboard assets are never mutated.
 
-The graph owns conversation structure. The scene owns UI, animation, audio and gameplay reactions.
+Nodes return `DialectExecutionResult`: continue to a target, wait for advance, await a choice, suspend, or end. Choice and condition targets are compiled by semantic port name rather than visual port order.
 
-## Documentation
+## Localization and variables
 
-Graph authoring, director integration, custom actions, conditions and Localization are covered in
-[Documentation](./Documentation~/index.md). Those guides hold the detailed workflow so this page can
-stay focused on the package's role and boundaries.
+Dialogue text and speakers accept inline text, a `LocalizedString`, or a shared blackboard variable. Locale changes refresh the visible line or choices without advancing the session. Create reusable boards with **Assets > Create > Dialect > Blackboard**; their Inspector supports typed defaults, reorder, duplicate, search, and validation while hiding stable IDs.
 
-See the [changelog](./CHANGELOG.md) for release history and compatibility notes.
+Supported values are string, localized string, bool, int, float, and Unity Object. Each play session copies defaults into a runtime overlay.
+
+## Extending Dialect
+
+Authoring extensions live in an Editor assembly. Derive from public `DialectNode`, implement `IDialectNodeCompiler`, and return a serializable `RuntimeNode`. The importer discovers the interface and does not contain a switch over built-in node types. Reusable `DialectAction` and `DialectCondition` assets remain the quickest option for project logic.
+
+See [the manual](Documentation~/index.md), [runtime API](Documentation~/runtime.md), [authoring guide](Documentation~/authoring.md), [shared blackboards](Documentation~/shared-blackboards.md), [localization](Documentation~/localization.md), [validation](Documentation~/validation.md), [debugging](Documentation~/debugging.md), and [custom-node guide](Documentation~/custom-nodes.md).
 
 ## License
 
-MIT. See [LICENSE.md](./LICENSE.md).
+[MIT](LICENSE.md)
