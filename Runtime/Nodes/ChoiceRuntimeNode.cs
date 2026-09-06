@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Dialect.Blackboards;
 using Dialect.Core;
 using Dialect.Executors;
+using Dialect.Values;
 using UnityEngine;
 
 namespace Dialect.Nodes
@@ -10,10 +11,13 @@ namespace Dialect.Nodes
     [Serializable]
     public struct DialectChoiceDefinition
     {
-        [SerializeField] DialectText text;
+        [SerializeField] DialectTextExpression text;
         [SerializeField] int target;
 
         public DialectChoiceDefinition(DialectText text, int target)
+            : this(new DialectTextExpression(text), target) { }
+
+        public DialectChoiceDefinition(DialectTextExpression text, int target)
         {
             this.text = text;
             this.target = target;

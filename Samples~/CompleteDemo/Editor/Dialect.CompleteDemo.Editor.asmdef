@@ -1,0 +1,7 @@
+{
+  "name": "Dialect.CompleteDemo.Editor",
+  "rootNamespace": "Dialect.Samples.Complete.Editor",
+  "references": ["Dialect", "Dialect.Editor", "Dialect.CompleteDemo", "Unity.Localization", "Unity.Localization.Editor"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}

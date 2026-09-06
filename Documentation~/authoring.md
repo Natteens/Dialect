@@ -1,9 +1,15 @@
-# Authoring graphs
+# Getting started and authoring
 
-Create **Dialect > Dialogue Graph** from the Assets menu. New graphs contain a valid Start to End path. Add nodes from the Dialogue categories and connect every required flow output.
+Create **Dialect > Dialogue Graph** from the Assets menu. The Project-window creation flow behaves like other Unity assets and creates a connected Start and End without opening a file browser.
 
-Dialogue uses a `DialectText` value for both speaker and line. Choose Inline, Localized, or Blackboard at the value source. Choice exposes one text value and one explicit target per option. Condition has named True and False outputs. Action and Condition nodes reference reusable ScriptableObjects.
+Use Dialogue for a line that waits for `Advance`, Choice for explicit player targets, Condition for True/False routing, Action for project behavior, and End for completion. Flow outputs are single-capacity; End accepts multiple incoming connections. Text inputs accept authored `DialectText`, native Graph Toolkit string or `LocalizedString` variables, constants, Shared Variable nodes, and external compatible value nodes.
 
-Graph validation reports missing or duplicate Start nodes, missing End nodes, required outputs, missing actions or conditions, empty choices, and unreachable nodes in Graph Toolkit's diagnostics. An incomplete graph still imports as an invalid runtime asset with stored diagnostics.
+The graph toolbar provides:
 
-Create shared defaults through **Dialect > Blackboard**. Variable IDs remain stable when renamed and are hidden from routine authoring. Runtime writes affect only the active session overlay.
+- **Validate**: saves and reimports the graph so diagnostics reflect the compiled asset.
+- **Shared Boards**: links, reorders, and removes `DialectBlackboard` assets with Undo.
+- **Debug**: controls node, wire, and port preview visualization.
+
+New graphs copy the optional boards configured in **Project Settings > Dialect** once. Changing the project default later does not mutate existing graphs.
+
+An incomplete graph still imports. `DialectRuntimeGraph.IsValid` remains false and its `Diagnostics` explain why. This keeps Unity references stable during normal authoring.

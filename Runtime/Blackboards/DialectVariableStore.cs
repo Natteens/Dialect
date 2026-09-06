@@ -6,15 +6,24 @@ namespace Dialect.Blackboards
     {
         readonly Dictionary<string, DialectValue> values = new();
         public DialectVariableStore(IEnumerable<DialectBlackboard> blackboards)
+            : this(null, blackboards) { }
+
+        public DialectVariableStore(IEnumerable<DialectVariableDefinition> localVariables,
+            IEnumerable<DialectBlackboard> sharedBlackboards)
         {
-            if (blackboards == null) return;
-            foreach (var blackboard in blackboards)
+            AddDefaults(localVariables, "local variables");
+            if (sharedBlackboards == null) return;
+            var boards = new HashSet<DialectBlackboard>();
+            foreach (var blackboard in sharedBlackboards)
             {
                 if (blackboard == null) continue;
-                foreach (var definition in blackboard.Variables)
-                    if (definition?.DefaultValue != null) values[definition.Id] = definition.DefaultValue.Clone();
+                if (!boards.Add(blackboard))
+                    throw new System.InvalidOperationException($"Blackboard '{blackboard.name}' is referenced more than once.");
+                AddDefaults(blackboard.Variables, $"blackboard '{blackboard.name}'");
             }
         }
+        public int Count => values.Count;
+        public bool Contains(string id) => !string.IsNullOrWhiteSpace(id) && values.ContainsKey(id);
         public bool TryGetValue(string id, out DialectValue value) => values.TryGetValue(id, out value);
         public bool TryGet<T>(string id, out T value)
         {
@@ -39,6 +48,18 @@ namespace Dialect.Blackboards
         {
             if (snapshot == null) return;
             foreach (var pair in snapshot) TrySet(pair.Key, pair.Value);
+        }
+
+        void AddDefaults(IEnumerable<DialectVariableDefinition> definitions, string source)
+        {
+            if (definitions == null) return;
+            foreach (var definition in definitions)
+            {
+                if (definition?.DefaultValue == null || string.IsNullOrWhiteSpace(definition.Id))
+                    throw new System.InvalidOperationException($"{source} contains an invalid variable definition.");
+                if (!values.TryAdd(definition.Id, definition.DefaultValue.Clone()))
+                    throw new System.InvalidOperationException($"Variable ID '{definition.Id}' is duplicated across {source}.");
+            }
         }
     }
 }

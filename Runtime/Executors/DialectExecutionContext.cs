@@ -32,5 +32,10 @@ namespace Dialect.Executors
             value = default;
             return false;
         }
+
+        public void ReportResolvedValue(string portId, string value)
+        {
+            if (!string.IsNullOrEmpty(portId)) Director.ReportResolvedValue(portId, value);
+        }
     }
 }

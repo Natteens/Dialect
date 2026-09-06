@@ -1,7 +1,9 @@
 # Localization
 
-Dialogue speakers, lines, and choices use `DialectText`. Select Inline for literal text, Localized for a Unity `LocalizedString`, or Blackboard for a shared string value.
+`DialectText` stores an Inline, Localized, or Blackboard-authored fallback. A connected value can also resolve a string, `LocalizedString`, or `DialectText` at runtime. This keeps ports dynamic without adding dynamic cases to the serialized source enum.
 
-Dialect subscribes to `LocalizationSettings.SelectedLocaleChanged` while a director is enabled. If a line or choice set is visible, the current runtime node resolves its content again and publishes a replacement payload. The session stays on the same node and does not advance.
+Dialect uses synchronous `LocalizedString.GetLocalizedString()` when a node presents or refreshes. Dialogue presentation needs a value immediately, and Unity Localization has already loaded the selected locale in normal gameplay. Making the whole execution pump asynchronous would add state and allocation costs without improving this contract. Projects that stream tables late should preload those tables before starting a session.
 
-Missing or empty localization references resolve to an empty string. Validate tables and entries with Unity Localization tools before shipping.
+While a Director is enabled it listens for `SelectedLocaleChanged`. If a line or choice is visible, only that node's presentation is resolved again. The node index, pending target, choices, and session identity remain unchanged. Repeated locale changes publish repeated replacement payloads; Stop, graph replacement, disable, and completion prevent stale refreshes.
+
+Graph validation reports empty localized references, missing table collections, and missing entries. Runtime missing translations follow Unity Localization's configured fallback behavior and do not advance the graph.

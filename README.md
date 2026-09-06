@@ -1,28 +1,41 @@
 # Dialect
 
-Dialect is a typed dialogue graph runtime and authoring toolkit for Unity 6.6. It keeps the graph focused on narrative flow while letting game code own presentation, input, actions, conditions, and save data.
+Dialect is a typed dialogue graph runtime and authoring toolkit for Unity 6.6. Graph Toolkit owns visual authoring; compact compiled assets and an iterative runtime own playback. Game code keeps control of presentation, input, actions, conditions, and persistence.
 
 ## Requirements
 
 - Unity 6000.6 or newer
 - Unity Localization 1.5.9 or newer
 
-Graph Toolkit ships as a Unity module in 6000.6, so Dialect does not declare the obsolete experimental package.
+Graph Toolkit ships with Unity 6000.6, so Dialect does not declare an old experimental Graph Toolkit package.
 
-## Install
+## Features
 
-Add the Git URL through Package Manager:
+- `.dlg` graphs with Start, Dialogue, Choice, Condition, Action, and End
+- local Graph Toolkit variables and reusable `DialectBlackboard` assets
+- string, `LocalizedString`, bool, int, float, and Unity Object values
+- inline, localized, local, shared, constant, and custom connected speaker/text values
+- per-session overrides, snapshots, and restore without mutating assets
+- public custom flow and value-node SDKs
+- GraphLogger diagnostics and safe Create Start/Create End fixes
+- Validate, Shared Boards, and Debug graph toolbar controls
+- current-node, traversed-wire, and compact port-value visualization
+- a Play Mode Director Inspector and a complete UI Toolkit sample
+
+## Installation
+
+Add this Git URL through Unity Package Manager:
 
 ```
 https://github.com/Natteens/Dialect.git
 ```
 
-## First dialogue
+## Quick start
 
-1. Create a graph with **Assets > Create > Dialect > Dialogue Graph**. A connected Start and End are created automatically.
-2. Add Dialogue, Choice, Condition, or Action nodes from the graph library.
-3. Add `DialectDirector` to a scene object and assign the imported `.dlg` runtime asset as its default graph.
-4. Subscribe to typed events and call `Advance` or `Choose` from your UI.
+1. Create **Assets > Create > Dialect > Dialogue Graph**. Dialect creates a connected Start and End.
+2. Add Dialogue or Choice nodes and connect their flow.
+3. Add `DialectDirector` to a scene object and assign the imported `.dlg` asset.
+4. Subscribe a UI adapter and call `Advance`, `Choose`, or `Resume` only when valid.
 
 ```csharp
 director.LinePresented += line => view.Show(line.Speaker, line.Text);
@@ -34,25 +47,19 @@ director.Advance();
 director.Choose(0);
 ```
 
-One director can play any number of graph assets. `TryPlay` returns false for an invalid graph; `Play` reports invalid requests with an exception. Starting another graph interrupts the active session explicitly.
+`TryPlay` returns `false` for invalid requests. `Play` throws with compile diagnostics. A successful new Play interrupts the old session; an invalid replacement leaves the old session running.
 
-## Runtime model
+## Variables and localization
 
-`DialectSession` owns the current graph, node, playback state, termination reason, user data, choices, and a per-session variable overlay. The director executes automatic nodes in an iterative pump with a configurable runaway guard. Runtime assets and blackboard assets are never mutated.
+Local variables live inside one `.dlg`. Shared values live in `DialectBlackboard` assets. A session builds its store in this order: local defaults, shared defaults, then caller overrides. Conflicting IDs or names are rejected by authoring/import validation; duplicate IDs are also rejected at the runtime boundary.
 
-Nodes return `DialectExecutionResult`: continue to a target, wait for advance, await a choice, suspend, or end. Choice and condition targets are compiled by semantic port name rather than visual port order.
+Dialogue and Choice text refresh when the selected locale changes. Refreshing republishes the visible payload without moving the current node or restarting the session.
 
-## Localization and variables
+## Extensibility and debugging
 
-Dialogue text and speakers accept inline text, a `LocalizedString`, or a shared blackboard variable. Locale changes refresh the visible line or choices without advancing the session. Create reusable boards with **Assets > Create > Dialect > Blackboard**; their Inspector supports typed defaults, reorder, duplicate, search, and validation while hiding stable IDs.
+External Editor assemblies can derive `DialectNode` or `DialectValueNode` and implement the matching compiler interface. Runtime assemblies provide serializable `RuntimeNode` and `DialectValueResolver` implementations. The importer discovers these contracts without changes to Dialect.
 
-Supported values are string, localized string, bool, int, float, and Unity Object. Each play session copies defaults into a runtime overlay.
-
-## Extending Dialect
-
-Authoring extensions live in an Editor assembly. Derive from public `DialectNode`, implement `IDialectNodeCompiler`, and return a serializable `RuntimeNode`. The importer discovers the interface and does not contain a switch over built-in node types. Reusable `DialectAction` and `DialectCondition` assets remain the quickest option for project logic.
-
-See [the manual](Documentation~/index.md), [runtime API](Documentation~/runtime.md), [authoring guide](Documentation~/authoring.md), [shared blackboards](Documentation~/shared-blackboards.md), [localization](Documentation~/localization.md), [validation](Documentation~/validation.md), [debugging](Documentation~/debugging.md), and [custom-node guide](Documentation~/custom-nodes.md).
+During Play Mode, select the Director for valid playback controls or open its active graph to see runtime visualization. See the [manual](Documentation~/index.md), [API guide](Documentation~/api.md), [custom-node guide](Documentation~/custom-nodes.md), and [samples](Documentation~/samples.md).
 
 ## License
 

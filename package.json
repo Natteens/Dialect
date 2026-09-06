@@ -26,6 +26,11 @@
       "displayName": "Runtime UI",
       "description": "A minimal typed UI adapter for DialectDirector.",
       "path": "Samples~/RuntimeUI"
+    },
+    {
+      "displayName": "Complete Dialogue Demo",
+      "description": "A complete Dialogue, Choice, Condition, Action, variables, localization-ready UI, and custom value node workflow.",
+      "path": "Samples~/CompleteDemo"
     }
   ]
 }

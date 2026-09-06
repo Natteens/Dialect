@@ -18,13 +18,13 @@ namespace Dialect.Editor.Inspectors
             list = new ReorderableList(serializedObject, variables, true, true, false, true)
             {
                 drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Variables"),
-                elementHeightCallback = index => EditorGUI.GetPropertyHeight(variables.GetArrayElementAtIndex(index), true) + 6,
+                elementHeightCallback = index => Matches(variables.GetArrayElementAtIndex(index))
+                    ? EditorGUI.GetPropertyHeight(variables.GetArrayElementAtIndex(index), true) + 6 : 0,
                 drawElementCallback = (rect, index, active, focused) =>
                 {
                     var element = variables.GetArrayElementAtIndex(index);
+                    if (!Matches(element)) return;
                     var name = element.FindPropertyRelative("name").stringValue;
-                    if (!string.IsNullOrWhiteSpace(search) && name.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0)
-                    { EditorGUI.LabelField(rect, $"{name} (filtered)", EditorStyles.miniLabel); return; }
                     rect.y += 2;
                     EditorGUI.PropertyField(rect, element, new GUIContent(string.IsNullOrWhiteSpace(name) ? "Unnamed" : name), true);
                 }
@@ -35,11 +35,16 @@ namespace Dialect.Editor.Inspectors
         {
             serializedObject.Update();
             search = EditorGUILayout.TextField(EditorGUIUtility.IconContent("Search Icon"), search);
+            list.draggable = string.IsNullOrWhiteSpace(search);
             list.DoLayoutList();
             if (GUILayout.Button("Add Variable")) ShowAddMenu();
             if (list.index >= 0 && GUILayout.Button("Duplicate Selected")) Duplicate(list.index);
+            if (serializedObject.ApplyModifiedProperties())
+            {
+                foreach (var item in targets)
+                    if (item is DialectBlackboard board) board.RepairVariableIds();
+            }
             DrawValidation();
-            serializedObject.ApplyModifiedProperties();
         }
 
         void ShowAddMenu()
@@ -76,10 +81,18 @@ namespace Dialect.Editor.Inspectors
         void DrawValidation()
         {
             var board = (DialectBlackboard)target;
-            var names = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var variable in board.Variables)
-                if (variable == null || string.IsNullOrWhiteSpace(variable.Name) || !names.Add(variable.Name))
-                { EditorGUILayout.HelpBox("Variables need unique, non-empty names.", MessageType.Warning); return; }
+            var diagnostics = new System.Collections.Generic.List<string>();
+            board.GetDiagnostics(diagnostics);
+            foreach (var diagnostic in diagnostics) EditorGUILayout.HelpBox(diagnostic, MessageType.Warning);
+        }
+
+        bool Matches(SerializedProperty element)
+        {
+            if (string.IsNullOrWhiteSpace(search)) return true;
+            var name = element.FindPropertyRelative("name").stringValue;
+            var value = element.FindPropertyRelative("defaultValue").managedReferenceValue as DialectValue;
+            return name.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   (value?.Type.ToString().IndexOf(search, StringComparison.OrdinalIgnoreCase) ?? -1) >= 0;
         }
 
         static DialectValue CreateValue(DialectValueType type) => type switch

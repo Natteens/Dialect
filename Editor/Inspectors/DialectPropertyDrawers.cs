@@ -53,12 +53,15 @@ namespace Dialect.Editor.Inspectors
             line.y += line.height + 3;
             var board = boardProperty.objectReferenceValue as DialectBlackboard;
             if (board == null) { EditorGUI.LabelField(line, "Variable", "Select a blackboard first"); return; }
-            var names = board.Variables.Select(variable => variable?.Name ?? "Missing").ToArray();
-            var current = Math.Max(0, Array.FindIndex(board.Variables.ToArray(), variable => variable?.Id == idProperty.stringValue));
+            var variables = board.Variables.ToArray();
+            var names = new string[variables.Length + 1];
+            names[0] = "None";
+            for (var i = 0; i < variables.Length; i++) names[i + 1] = variables[i]?.Name ?? "Missing";
+            var current = Array.FindIndex(variables, variable => variable?.Id == idProperty.stringValue) + 1;
             using (new EditorGUI.DisabledScope(names.Length == 0))
             {
-                var selected = EditorGUI.Popup(line, "Variable", current, names.Length == 0 ? new[] { "No variables" } : names);
-                if (names.Length > 0) idProperty.stringValue = board.Variables[selected].Id;
+                var selected = EditorGUI.Popup(line, "Variable", current, names);
+                if (selected != current) idProperty.stringValue = selected == 0 ? string.Empty : variables[selected - 1].Id;
             }
         }
     }

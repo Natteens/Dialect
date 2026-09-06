@@ -30,6 +30,8 @@ namespace Dialect.Blackboards
     public sealed class DialectLocalizedStringValue : DialectValue
     {
         [SerializeField] LocalizedString value = new();
+        public DialectLocalizedStringValue() { }
+        public DialectLocalizedStringValue(LocalizedString value) => this.value = value ?? new LocalizedString();
         public LocalizedString Value => value;
         public override DialectValueType Type => DialectValueType.LocalizedString;
         public override object BoxedValue => value;
@@ -76,6 +78,8 @@ namespace Dialect.Blackboards
     public sealed class DialectObjectValue : DialectValue
     {
         [SerializeField] UnityEngine.Object value;
+        public DialectObjectValue() { }
+        public DialectObjectValue(UnityEngine.Object value) => this.value = value;
         public UnityEngine.Object Value => value;
         public override DialectValueType Type => DialectValueType.Object;
         public override object BoxedValue => value;

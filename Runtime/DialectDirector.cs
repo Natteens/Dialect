@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Dialect.Blackboards;
 using Dialect.Core;
 using Dialect.Executors;
@@ -15,6 +16,8 @@ namespace Dialect
         [SerializeField, Min(1)] int maxAutomaticSteps = 1024;
 
         bool isPumping;
+        bool dispatchingLine;
+        bool dispatchingChoices;
         PendingCommand pendingCommand;
         int pendingChoice = -1;
 
@@ -32,13 +35,29 @@ namespace Dialect
         public event Action<DialectSession, DialectTerminationReason> SessionEnded;
         public event Action<DialectSession, string> SessionFaulted;
         public event Action<DialectSession, RuntimeNode> NodeEntered;
+        public event Action<DialectSession, DialectTransition> Transitioned;
+        public event Action<DialectSession, DialectValuePreview> ValueResolved;
 
-        void OnEnable() => LocalizationSettings.SelectedLocaleChanged += OnLocaleChanged;
+#if UNITY_EDITOR
+        internal static event Action<DialectDirector> EditorDirectorEnabled;
+        internal static event Action<DialectDirector> EditorDirectorDisabled;
+#endif
+
+        void OnEnable()
+        {
+            LocalizationSettings.SelectedLocaleChanged += OnLocaleChanged;
+#if UNITY_EDITOR
+            EditorDirectorEnabled?.Invoke(this);
+#endif
+        }
 
         void OnDisable()
         {
             LocalizationSettings.SelectedLocaleChanged -= OnLocaleChanged;
             if (IsRunning) Terminate(DialectTerminationReason.DirectorDisabled, DialectPlaybackState.Ended);
+#if UNITY_EDITOR
+            EditorDirectorDisabled?.Invoke(this);
+#endif
         }
 
         public void Play() => Play(defaultGraph, null);
@@ -46,18 +65,37 @@ namespace Dialect
 
         public void Play(DialectRuntimeGraph graph, object userData)
         {
-            if (TryPlay(graph, userData)) return;
+            if (TryPlay(graph, userData, null)) return;
             var details = graph == null ? "The graph is null." : string.Join(" ", graph.Diagnostics);
             throw new InvalidOperationException($"Dialect could not start the requested graph. {details}".TrimEnd());
         }
 
         public bool TryPlay(DialectRuntimeGraph graph) => TryPlay(graph, null);
 
-        public bool TryPlay(DialectRuntimeGraph graph, object userData)
+        public bool TryPlay(DialectRuntimeGraph graph, object userData) => TryPlay(graph, userData, null);
+
+        public void Play(DialectRuntimeGraph graph, object userData,
+            IReadOnlyDictionary<string, DialectValue> overrides)
+        {
+            if (TryPlay(graph, userData, overrides)) return;
+            var details = graph == null ? "The graph is null." : string.Join(" ", graph.Diagnostics);
+            throw new InvalidOperationException($"Dialect could not start the requested graph. {details}".TrimEnd());
+        }
+
+        public bool TryPlay(DialectRuntimeGraph graph, object userData,
+            IReadOnlyDictionary<string, DialectValue> overrides)
         {
             if (graph == null || !graph.IsValid || !graph.TryGetNode(graph.EntryNodeIndex, out _)) return false;
+            DialectVariableStore variables;
+            try { variables = new DialectVariableStore(graph.LocalVariables, graph.Blackboards); }
+            catch (InvalidOperationException) { return false; }
+            if (overrides != null)
+                foreach (var pair in overrides)
+                    if (!variables.TrySet(pair.Key, pair.Value)) return false;
             if (IsRunning) Terminate(DialectTerminationReason.Interrupted, DialectPlaybackState.Ended);
-            Session = new DialectSession(graph, new DialectVariableStore(graph.Blackboards), userData);
+            pendingCommand = PendingCommand.None;
+            pendingChoice = -1;
+            Session = new DialectSession(graph, variables, userData);
             SessionStarted?.Invoke(Session);
             Pump();
             return true;
@@ -65,9 +103,14 @@ namespace Dialect
 
         public bool Advance()
         {
-            if (isPumping && Session != null) { pendingCommand = PendingCommand.Advance; return true; }
+            if (isPumping)
+            {
+                if (!dispatchingLine) return false;
+                pendingCommand = PendingCommand.Advance;
+                return true;
+            }
             if (Session?.State != DialectPlaybackState.WaitingForAdvance) return false;
-            Session.CurrentNodeIndex = Session.PendingTarget;
+            MoveTo(Session.PendingTarget);
             Session.State = DialectPlaybackState.Running;
             Pump();
             return true;
@@ -75,10 +118,10 @@ namespace Dialect
 
         public bool Choose(int index)
         {
-            if (isPumping && Session?.CurrentChoices != null && index >= 0 && index < Session.CurrentChoices.Count)
+            if (isPumping && dispatchingChoices && Session?.CurrentChoices != null && index >= 0 && index < Session.CurrentChoices.Count)
             { pendingCommand = PendingCommand.Choice; pendingChoice = index; return true; }
             if (Session?.State != DialectPlaybackState.WaitingForChoice || Session.CurrentChoices == null || index < 0 || index >= Session.CurrentChoices.Count) return false;
-            Session.CurrentNodeIndex = Session.CurrentChoices.Choices[index].TargetNodeIndex;
+            MoveTo(Session.CurrentChoices.Choices[index].TargetNodeIndex);
             Session.CurrentChoices = null;
             Session.State = DialectPlaybackState.Running;
             Pump();
@@ -104,15 +147,22 @@ namespace Dialect
         {
             Session.CurrentLine = line;
             Session.CurrentChoices = null;
-            LinePresented?.Invoke(line);
+            dispatchingLine = true;
+            try { LinePresented?.Invoke(line); }
+            finally { dispatchingLine = false; }
         }
 
         internal void PresentChoices(DialectChoiceSet choices)
         {
             Session.CurrentChoices = choices;
             Session.CurrentLine = default;
-            ChoicesPresented?.Invoke(choices);
+            dispatchingChoices = true;
+            try { ChoicesPresented?.Invoke(choices); }
+            finally { dispatchingChoices = false; }
         }
+
+        internal void ReportResolvedValue(string portId, string value) =>
+            ValueResolved?.Invoke(Session, new DialectValuePreview(portId, value));
 
         void Pump()
         {
@@ -150,7 +200,7 @@ namespace Dialect
         {
             switch (result.Kind)
             {
-                case DialectExecutionKind.Continue: Session.CurrentNodeIndex = result.TargetNodeIndex; break;
+                case DialectExecutionKind.Continue: MoveTo(result.TargetNodeIndex); break;
                 case DialectExecutionKind.WaitForAdvance:
                     Session.PendingTarget = result.TargetNodeIndex;
                     Session.State = DialectPlaybackState.WaitingForAdvance;
@@ -169,16 +219,24 @@ namespace Dialect
             pendingChoice = -1;
             if (command == PendingCommand.Stop) Terminate(DialectTerminationReason.Stopped, DialectPlaybackState.Ended);
             else if (command == PendingCommand.Advance && Session?.State == DialectPlaybackState.WaitingForAdvance)
-            { Session.CurrentNodeIndex = Session.PendingTarget; Session.State = DialectPlaybackState.Running; }
+            { MoveTo(Session.PendingTarget); Session.State = DialectPlaybackState.Running; }
             else if (command == PendingCommand.Choice && Session?.State == DialectPlaybackState.WaitingForChoice &&
                      choice >= 0 && choice < Session.CurrentChoices.Count)
-            { Session.CurrentNodeIndex = Session.CurrentChoices.Choices[choice].TargetNodeIndex; Session.State = DialectPlaybackState.Running; }
+            { MoveTo(Session.CurrentChoices.Choices[choice].TargetNodeIndex); Session.State = DialectPlaybackState.Running; }
         }
 
         void OnLocaleChanged(Locale locale)
         {
             if (!IsRunning || Session == null || !Session.Graph.TryGetNode(Session.CurrentNodeIndex, out var node)) return;
             node.RefreshPresentation(new DialectExecutionContext(this, Session.Graph, Session, Session.Variables, Session.UserData));
+        }
+
+        void MoveTo(int target)
+        {
+            if (Session == null) return;
+            var from = Session.CurrentNodeIndex;
+            Session.CurrentNodeIndex = target;
+            if (Session.Graph.TryGetTransition(from, target, out var transition)) Transitioned?.Invoke(Session, transition);
         }
 
         void Fault(string message, DialectTerminationReason reason)
@@ -194,6 +252,9 @@ namespace Dialect
             if (Session == null) return;
             Session.State = state;
             Session.TerminationReason = reason;
+            Session.CurrentLine = default;
+            Session.CurrentChoices = null;
+            Session.PendingTarget = -1;
             SessionEnded?.Invoke(Session, reason);
         }
     }

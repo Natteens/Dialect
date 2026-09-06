@@ -37,4 +37,12 @@ namespace Dialect.Core
         public IReadOnlyList<DialectChoice> Choices { get; }
         public int Count => Choices?.Count ?? 0;
     }
+
+    public readonly struct DialectValuePreview
+    {
+        public DialectValuePreview(string portId, string value)
+        { PortId = portId ?? string.Empty; Value = value ?? string.Empty; }
+        public string PortId { get; }
+        public string Value { get; }
+    }
 }

@@ -1,23 +1,29 @@
-# Custom nodes
+# Custom flow and value nodes
 
-Place authoring nodes in an Editor assembly that references `Dialect.Editor`; place runtime nodes in a runtime assembly that references `Dialect`.
+Put runtime types in a player assembly referencing `Dialect`. Put authoring types in an Editor assembly referencing `Dialect.Editor`.
+
+A custom flow node derives `DialectNode`, implements `IDialectNodeCompiler`, defines ports with the protected helpers, compiles explicit targets, and validates through the supplied context. A custom value node derives `DialectValueNode`, implements `IDialectValueNodeCompiler`, and returns a serializable `DialectValueResolver`.
 
 ```csharp
-[Serializable, Node("My Game", null, "Wait")]
-public sealed class WaitNode : DialectNode, IDialectNodeCompiler
+[Serializable, Node("My Game", null, "Player Name"), UseWithGraph(typeof(DialectGraph))]
+public sealed class PlayerNameNode : DialectValueNode, IDialectValueNodeCompiler
 {
-    protected override void OnDefinePorts(IPortDefinitionContext ports)
-    {
-        AddFlowInput(ports);
-        AddFlowOutput(ports);
-    }
+    protected override void OnDefinePorts(IPortDefinitionContext ports) =>
+        AddValueOutput<DialectText>(ports);
 
-    public RuntimeNode Compile(DialectNodeCompilationContext context) =>
-        new WaitRuntimeNode(context.Target(FlowOutput));
+    public Type ValueType => typeof(string);
+    public DialectValueResolver CompileValue(DialectValueNodeCompilationContext context) =>
+        new PlayerNameResolver();
+    public void Validate(DialectValueNodeValidationContext context) { }
+}
 
-    public void Validate(DialectNodeValidationContext context) { }
-    public bool WaitsForInput => true;
+[Serializable]
+public sealed class PlayerNameResolver : DialectValueResolver
+{
+    public override Type ValueType => typeof(string);
+    public override object Resolve(DialectExecutionContext context) =>
+        context.TryGetUserData<PlayerState>(out var state) ? state.Name : string.Empty;
 }
 ```
 
-Runtime nodes are serializable managed references and return a `DialectExecutionResult`. Use `context.Target(portName)` for explicit flow semantics and `context.Read<T>(portName)` for values. Add validation through the supplied context. The importer discovers this interface across assemblies.
+Compilation contexts expose `Graph`, `Node`, `Read<T>`, `ReadText`, `Target`, and `Error` where applicable. Validation contexts expose equivalent read/connection helpers and GraphLogger-backed Error/Warning methods. External tests compile and execute both SDK paths without importer changes.

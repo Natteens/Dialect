@@ -5,7 +5,10 @@
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner",
     "Dialect",
-    "Dialect.Editor"
+    "Dialect.Editor",
+    "Unity.Localization",
+    "Unity.Localization.Editor",
+    "Unity.Addressables.Editor"
   ],
   "includePlatforms": [
     "Editor"

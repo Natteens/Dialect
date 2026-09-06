@@ -7,6 +7,8 @@ using Dialect.Executors;
 using Dialect.Nodes;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.Localization;
+using UnityEngine.Localization.Settings;
 
 namespace Dialect.Tests
 {
@@ -26,7 +28,7 @@ namespace Dialect.Tests
         [TearDown]
         public void TearDown()
         {
-            Object.DestroyImmediate(owner);
+            if (owner != null) Object.DestroyImmediate(owner);
             foreach (var asset in assets) Object.DestroyImmediate(asset);
             assets.Clear();
         }
@@ -152,6 +154,216 @@ namespace Dialect.Tests
             Assert.That(director.Session.TerminationReason, Is.EqualTo(DialectTerminationReason.Completed));
         }
 
+        [Test]
+        public void ChoiceRequestedFromPresentationCallbackIsQueued()
+        {
+            var graph = Graph(new StartRuntimeNode(1),
+                new ChoiceRuntimeNode(new List<DialectChoiceDefinition> { new(DialectText.Inline("Go"), 2) }),
+                new EndRuntimeNode());
+            director.ChoicesPresented += _ => director.Choose(0);
+            director.Play(graph);
+            Assert.That(director.Session.TerminationReason, Is.EqualTo(DialectTerminationReason.Completed));
+        }
+
+        [Test]
+        public void InvalidReentrantAdvanceIsRejected()
+        {
+            var action = ScriptableObject.CreateInstance<AdvanceAction>();
+            assets.Add(action);
+            action.Director = director;
+            director.Play(Graph(new StartRuntimeNode(1), new ActionRuntimeNode(action, 2), new EndRuntimeNode()));
+            Assert.That(action.Result, Is.False);
+            Assert.That(director.Session.TerminationReason, Is.EqualTo(DialectTerminationReason.Completed));
+        }
+
+        [Test]
+        public void StopRequestedFromPresentationCallbackEndsSession()
+        {
+            var graph = Graph(new StartRuntimeNode(1),
+                new DialogueRuntimeNode(default, DialectText.Inline("Stop"), 2), new EndRuntimeNode());
+            director.LinePresented += _ => director.Stop();
+            director.Play(graph);
+            Assert.That(director.Session.TerminationReason, Is.EqualTo(DialectTerminationReason.Stopped));
+        }
+
+        [Test]
+        public void InvalidTargetFaultsInsteadOfThrowing()
+        {
+            director.Play(Graph(new StartRuntimeNode(99)));
+            Assert.That(director.Session.State, Is.EqualTo(DialectPlaybackState.Faulted));
+            Assert.That(director.Session.TerminationReason, Is.EqualTo(DialectTerminationReason.ExecutionError));
+        }
+
+        [Test]
+        public void ResumeOnlyRunsSuspendedSession()
+        {
+            var marker = new SuspensionMarker();
+            director.Play(Graph(new SuspendOnceRuntimeNode(1), new EndRuntimeNode()), marker);
+            Assert.That(director.Session.State, Is.EqualTo(DialectPlaybackState.Suspended));
+            Assert.That(director.Resume(), Is.True);
+            Assert.That(director.Session.TerminationReason, Is.EqualTo(DialectTerminationReason.Completed));
+            Assert.That(director.Resume(), Is.False);
+        }
+
+        [Test]
+        public void DisablingDirectorTerminatesActiveSession()
+        {
+            director.Play(Graph(new DialogueRuntimeNode(default, DialectText.Inline("Wait"), 1), new EndRuntimeNode()));
+            director.enabled = false;
+            Assert.That(director.Session.TerminationReason, Is.EqualTo(DialectTerminationReason.DirectorDisabled));
+        }
+
+        [Test]
+        public void InvalidReplacementDoesNotInterruptCurrentGraph()
+        {
+            var waiting = Graph(new DialogueRuntimeNode(default, DialectText.Inline("Wait"), 1), new EndRuntimeNode());
+            var invalid = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
+            invalid.Configure("invalid", -1, new List<RuntimeNode>(), null, new List<string> { "Invalid" });
+            assets.Add(invalid);
+            director.Play(waiting);
+            Assert.That(director.TryPlay(invalid), Is.False);
+            Assert.That(director.Session.Graph, Is.SameAs(waiting));
+            Assert.That(director.Session.State, Is.EqualTo(DialectPlaybackState.WaitingForAdvance));
+        }
+
+        [Test]
+        public void InvalidOverrideDoesNotInterruptCurrentGraph()
+        {
+            var board = ScriptableObject.CreateInstance<DialectBlackboard>();
+            assets.Add(board);
+            var variable = board.AddVariable("Flag", new DialectBoolValue(true));
+            var waiting = Graph(new DialogueRuntimeNode(default, DialectText.Inline("Wait"), 1), new EndRuntimeNode());
+            var replacement = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
+            replacement.Configure("replacement", 0, new List<RuntimeNode> { new EndRuntimeNode() },
+                new List<DialectBlackboard> { board }, new List<string>());
+            assets.Add(replacement);
+            director.Play(waiting);
+            var overrides = new Dictionary<string, DialectValue>
+            { [variable.Id] = new DialectIntValue(4) };
+            Assert.That(director.TryPlay(replacement, null, overrides), Is.False);
+            Assert.That(director.Session.Graph, Is.SameAs(waiting));
+            Assert.That(director.Session.State, Is.EqualTo(DialectPlaybackState.WaitingForAdvance));
+        }
+
+        [Test]
+        public void DestroyingDirectorTerminatesActiveSession()
+        {
+            DialectTerminationReason? reason = null;
+            director.SessionEnded += (_, value) => reason = value;
+            director.Play(Graph(new DialogueRuntimeNode(default, DialectText.Inline("Wait"), 1), new EndRuntimeNode()));
+            Object.DestroyImmediate(owner);
+            owner = null;
+            Assert.That(reason, Is.EqualTo(DialectTerminationReason.DirectorDisabled));
+        }
+
+        [Test]
+        public void TransitionEventReportsCompiledWireMapping()
+        {
+            var graph = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
+            graph.Configure("graph", 0, new List<RuntimeNode> { new StartRuntimeNode(1), new EndRuntimeNode() },
+                null, null, new List<DialectTransition> { new(0, 1, "output", "input") }, new List<string>());
+            assets.Add(graph);
+            DialectTransition observed = default;
+            director.Transitioned += (_, transition) => observed = transition;
+            director.Play(graph);
+            Assert.That(observed.OutputPortId, Is.EqualTo("output"));
+            Assert.That(observed.InputPortId, Is.EqualTo("input"));
+        }
+
+        [Test]
+        public void SharedStringFeedsDialogueWithoutMutatingAsset()
+        {
+            var board = ScriptableObject.CreateInstance<DialectBlackboard>();
+            assets.Add(board);
+            var variable = board.AddVariable("Speaker", new DialectStringValue("Mara"));
+            var graph = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
+            graph.Configure("graph", 0, new List<RuntimeNode>
+            {
+                new DialogueRuntimeNode(DialectText.Blackboard(new DialectVariableReference(board, variable.Id)),
+                    DialectText.Inline("Hello"), 1), new EndRuntimeNode()
+            }, new List<DialectBlackboard> { board }, new List<string>());
+            assets.Add(graph);
+            DialectLine line = default;
+            director.LinePresented += value => line = value;
+            director.Play(graph);
+            Assert.That(line.Speaker, Is.EqualTo("Mara"));
+            Assert.That(director.Session.Variables.TrySet(variable.Id, new DialectStringValue("Alex")), Is.True);
+            Assert.That(((DialectStringValue)variable.DefaultValue).Value, Is.EqualTo("Mara"));
+        }
+
+        [Test]
+        public void EmptyLocalizedStringResolvesAsEmptyText()
+        {
+            DialectLine line = default;
+            director.LinePresented += value => line = value;
+            director.Play(Graph(new DialogueRuntimeNode(DialectText.Localized(new LocalizedString()),
+                DialectText.Localized(new LocalizedString()), 1), new EndRuntimeNode()));
+            Assert.That(line.Speaker, Is.Empty);
+            Assert.That(line.Text, Is.Empty);
+        }
+
+        [Test]
+        public void LocaleChangesRefreshVisibleLineWithoutMovingSession()
+        {
+            var original = LocalizationSettings.SelectedLocale;
+            var first = Locale.CreateLocale("x-dialect-a");
+            var second = Locale.CreateLocale("x-dialect-b");
+            assets.Add(first);
+            assets.Add(second);
+            var callbacks = 0;
+            director.LinePresented += _ => callbacks++;
+            try
+            {
+                director.Play(Graph(new DialogueRuntimeNode(DialectText.Inline("Guide"), DialectText.Inline("Line"), 1),
+                    new EndRuntimeNode()));
+                var nodeIndex = director.Session.CurrentNodeIndex;
+                LocalizationSettings.SelectedLocale = first;
+                LocalizationSettings.SelectedLocale = second;
+                Assert.That(callbacks, Is.EqualTo(3));
+                Assert.That(director.Session.CurrentNodeIndex, Is.EqualTo(nodeIndex));
+                Assert.That(director.Session.State, Is.EqualTo(DialectPlaybackState.WaitingForAdvance));
+            }
+            finally { LocalizationSettings.SelectedLocale = original; }
+        }
+
+        [Test]
+        public void LocaleChangeRefreshesChoicesWithoutLosingSelectionState()
+        {
+            var original = LocalizationSettings.SelectedLocale;
+            var locale = Locale.CreateLocale("x-dialect-choice");
+            assets.Add(locale);
+            var callbacks = 0;
+            director.ChoicesPresented += _ => callbacks++;
+            try
+            {
+                director.Play(Graph(new ChoiceRuntimeNode(new List<DialectChoiceDefinition>
+                    { new(DialectText.Inline("Continue"), 1) }), new EndRuntimeNode()));
+                LocalizationSettings.SelectedLocale = locale;
+                Assert.That(callbacks, Is.EqualTo(2));
+                Assert.That(director.Session.State, Is.EqualTo(DialectPlaybackState.WaitingForChoice));
+                Assert.That(director.Session.CurrentChoices.Count, Is.EqualTo(1));
+            }
+            finally { LocalizationSettings.SelectedLocale = original; }
+        }
+
+        [Test]
+        public void LocaleChangeAfterStopDoesNotRefreshPresentation()
+        {
+            var original = LocalizationSettings.SelectedLocale;
+            var locale = Locale.CreateLocale("x-dialect-stopped");
+            assets.Add(locale);
+            var callbacks = 0;
+            director.LinePresented += _ => callbacks++;
+            try
+            {
+                director.Play(Graph(new DialogueRuntimeNode(default, DialectText.Inline("Line"), 1), new EndRuntimeNode()));
+                director.Stop();
+                LocalizationSettings.SelectedLocale = locale;
+                Assert.That(callbacks, Is.EqualTo(1));
+            }
+            finally { LocalizationSettings.SelectedLocale = original; }
+        }
+
         public sealed class FixedCondition : DialectCondition
         {
             public bool Result { get; set; }
@@ -166,6 +378,28 @@ namespace Dialect.Tests
             {
                 Director = context.Director;
                 UserData = context.UserData;
+            }
+        }
+
+        public sealed class AdvanceAction : DialectAction
+        {
+            public DialectDirector Director { get; set; }
+            public bool Result { get; private set; }
+            public override void Execute(DialectExecutionContext context) => Result = Director.Advance();
+        }
+
+        sealed class SuspensionMarker { public bool Resumed; }
+
+        [System.Serializable]
+        sealed class SuspendOnceRuntimeNode : RuntimeNode
+        {
+            [SerializeField] int next;
+            public SuspendOnceRuntimeNode(int next) => this.next = next;
+            public override DialectExecutionResult Execute(DialectExecutionContext context)
+            {
+                var marker = (SuspensionMarker)context.UserData;
+                if (!marker.Resumed) { marker.Resumed = true; return DialectExecutionResult.Suspended(); }
+                return DialectExecutionResult.ContinueTo(next);
             }
         }
 

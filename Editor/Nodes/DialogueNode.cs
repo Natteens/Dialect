@@ -9,8 +9,8 @@ namespace Dialect.Editor.Nodes
     [Serializable, Node("Dialogue", null, "Dialogue")]
     public sealed class DialogueNode : DialectNode, IDialectNodeCompiler
     {
-        const string SpeakerPort = "speaker";
-        const string TextPort = "text";
+        public const string SpeakerPort = "speaker";
+        public const string TextPort = "text";
         protected override void OnDefinePorts(IPortDefinitionContext context)
         {
             DefaultColor = new UnityEngine.Color(.25f, .48f, .78f);
@@ -21,9 +21,13 @@ namespace Dialect.Editor.Nodes
             AddFlowOutput(context);
         }
         public RuntimeNode Compile(DialectNodeCompilationContext context) => new DialogueRuntimeNode(
-            context.Read<DialectText>(SpeakerPort), context.Read<DialectText>(TextPort), context.Target(FlowOutput));
+            context.ReadText(SpeakerPort), context.ReadText(TextPort), context.Target(FlowOutput));
         public void Validate(DialectNodeValidationContext context)
-        { if (!context.IsConnected(FlowOutput)) context.Error("Dialogue must continue to another node."); }
+        {
+            context.ValidateText(SpeakerPort, "Speaker");
+            context.ValidateText(TextPort, "Line");
+            if (!context.IsConnected(FlowOutput)) context.Error("Dialogue must continue to another node.");
+        }
         public bool WaitsForInput => true;
     }
 }
