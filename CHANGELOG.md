@@ -1,3 +1,10 @@
+# [0.5.0](https://github.com/Natteens/Dialect/compare/v0.4.0...v0.5.0) (2026-09-07)
+
+
+### Features
+
+* overhaul Dialect authoring experience ([ac6b90c](https://github.com/Natteens/Dialect/commit/ac6b90cc1ec0d5b3c1dbe5d7ccd026a4c7a44b75))
+
 # [0.4.0](https://github.com/Natteens/Dialect/compare/v0.3.1...v0.4.0) (2026-09-06)
 
 
