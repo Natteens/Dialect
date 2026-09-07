@@ -1,3 +1,10 @@
+# [0.6.0](https://github.com/Natteens/Dialect/compare/v0.5.0...v0.6.0) (2026-09-07)
+
+
+### Features
+
+* expand Dialect built-in graph nodes ([0096650](https://github.com/Natteens/Dialect/commit/0096650dcb6a8a8a0f0931abb29032c67352c0fa))
+
 # [0.5.0](https://github.com/Natteens/Dialect/compare/v0.4.0...v0.5.0) (2026-09-07)
 
 
