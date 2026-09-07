@@ -1,0 +1,34 @@
+.ge-node {
+    min-width: 244px;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    border-bottom-left-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+.ge-node-title-part {
+    min-height: 30px;
+}
+
+/* Runtime Debug uses Graph Toolkit's node accent as its activity cue. */
+.ge-node .ge-color-line-part {
+    min-height: 5px;
+}
+
+.ge-node-title-part__subtitle {
+    opacity: 0.72;
+}
+
+.ge-horizontal-port-container-part {
+    padding-top: 4px;
+    padding-bottom: 5px;
+}
+
+.ge-node .unity-base-field {
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+.ge-node .unity-text-field__input {
+    min-width: 118px;
+}

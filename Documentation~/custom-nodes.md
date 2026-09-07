@@ -26,4 +26,4 @@ public sealed class PlayerNameResolver : DialectValueResolver
 }
 ```
 
-Compilation contexts expose `Graph`, `Node`, `Read<T>`, `ReadText`, `Target`, and `Error` where applicable. Validation contexts expose equivalent read/connection helpers and GraphLogger-backed Error/Warning methods. External tests compile and execute both SDK paths without importer changes.
+Compilation contexts expose `Graph`, `Node`, `Read<T>`, `ReadText`, `ReadRequiredText`, `CompileValue`, `Target`, and `Error` where applicable. Validation contexts expose equivalent read/connection helpers, `Mode`/`IsStrict`, and GraphLogger-backed Error/Warning methods. Keep incomplete-value requirements behind `IsStrict`; reserve live errors for broken structural contracts. External tests compile and execute both SDK paths without importer changes.

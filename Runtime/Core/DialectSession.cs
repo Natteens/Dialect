@@ -26,13 +26,18 @@ namespace Dialect.Core
 
     public sealed class DialectSession
     {
-        internal DialectSession(DialectRuntimeGraph graph, DialectVariableStore variables, object userData)
+        readonly System.Random random;
+        readonly System.Collections.Generic.Dictionary<string, string> valuePreviews = new();
+
+        internal DialectSession(DialectRuntimeGraph graph, DialectVariableStore variables, object userData, int randomSeed)
         {
             Graph = graph;
             Variables = variables;
             UserData = userData;
             CurrentNodeIndex = graph.EntryNodeIndex;
             State = DialectPlaybackState.Running;
+            RandomSeed = randomSeed;
+            random = new System.Random(randomSeed);
         }
 
         public DialectRuntimeGraph Graph { get; }
@@ -44,6 +49,14 @@ namespace Dialect.Core
         public DialectTerminationReason? TerminationReason { get; internal set; }
         public DialectLine CurrentLine { get; internal set; }
         public DialectChoiceSet CurrentChoices { get; internal set; }
+        public DialectTransition? LastTransition { get; internal set; }
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> ValuePreviews => valuePreviews;
+        public int RandomSeed { get; }
         internal int PendingTarget { get; set; } = -1;
+        internal int NextRandom(int maximum) => random.Next(maximum);
+        internal void SetValuePreview(string portId, string value)
+        {
+            if (!string.IsNullOrEmpty(portId)) valuePreviews[portId] = value ?? string.Empty;
+        }
     }
 }

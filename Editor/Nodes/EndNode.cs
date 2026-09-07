@@ -6,7 +6,7 @@ using Unity.GraphToolkit.Editor;
 namespace Dialect.Editor.Nodes
 {
     [Serializable]
-    [Node("Dialogue/Flow", null, "End")]
+    [Node("Flow", null, "End", "Packages/com.natteens.dialect/Editor/Styles/DialectNodes.uss")]
     public sealed class EndNode : DialectNode, IDialectNodeCompiler
     {
         protected override void OnDefinePorts(IPortDefinitionContext context)

@@ -14,6 +14,7 @@ namespace Dialect
     {
         [SerializeField] DialectRuntimeGraph defaultGraph;
         [SerializeField, Min(1)] int maxAutomaticSteps = 1024;
+        [SerializeField] int randomSeed = 1979;
 
         bool isPumping;
         bool dispatchingLine;
@@ -24,6 +25,7 @@ namespace Dialect
         enum PendingCommand { None, Advance, Choice, Stop }
 
         public DialectRuntimeGraph DefaultGraph { get => defaultGraph; set => defaultGraph = value; }
+        public int RandomSeed { get => randomSeed; set => randomSeed = value; }
         public DialectSession Session { get; private set; }
         public bool IsRunning => Session != null && Session.State is DialectPlaybackState.Running
             or DialectPlaybackState.WaitingForAdvance or DialectPlaybackState.WaitingForChoice
@@ -95,7 +97,7 @@ namespace Dialect
             if (IsRunning) Terminate(DialectTerminationReason.Interrupted, DialectPlaybackState.Ended);
             pendingCommand = PendingCommand.None;
             pendingChoice = -1;
-            Session = new DialectSession(graph, variables, userData);
+            Session = new DialectSession(graph, variables, userData, randomSeed);
             SessionStarted?.Invoke(Session);
             Pump();
             return true;
@@ -161,8 +163,11 @@ namespace Dialect
             finally { dispatchingChoices = false; }
         }
 
-        internal void ReportResolvedValue(string portId, string value) =>
+        internal void ReportResolvedValue(string portId, string value)
+        {
+            Session?.SetValuePreview(portId, value);
             ValueResolved?.Invoke(Session, new DialectValuePreview(portId, value));
+        }
 
         void Pump()
         {
@@ -236,7 +241,11 @@ namespace Dialect
             if (Session == null) return;
             var from = Session.CurrentNodeIndex;
             Session.CurrentNodeIndex = target;
-            if (Session.Graph.TryGetTransition(from, target, out var transition)) Transitioned?.Invoke(Session, transition);
+            if (Session.Graph.TryGetTransition(from, target, out var transition))
+            {
+                Session.LastTransition = transition;
+                Transitioned?.Invoke(Session, transition);
+            }
         }
 
         void Fault(string message, DialectTerminationReason reason)

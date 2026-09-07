@@ -6,7 +6,7 @@ using Unity.GraphToolkit.Editor;
 namespace Dialect.Editor.Nodes
 {
     [Serializable]
-    [Node("Dialogue/Flow", null, "Start")]
+    [Node("Flow", null, "Start", "Packages/com.natteens.dialect/Editor/Styles/DialectNodes.uss")]
     public sealed class StartNode : DialectNode, IDialectNodeCompiler
     {
         protected override void OnDefinePorts(IPortDefinitionContext context)
@@ -18,7 +18,7 @@ namespace Dialect.Editor.Nodes
 
         public RuntimeNode Compile(DialectNodeCompilationContext context) => new StartRuntimeNode(context.Target(FlowOutput));
         public void Validate(DialectNodeValidationContext context)
-        { if (!context.IsConnected(FlowOutput)) context.Error("Start must be connected."); }
+        { if (context.IsStrict && !context.IsConnected(FlowOutput)) context.Error("Start must be connected."); }
         public bool WaitsForInput => false;
     }
 }

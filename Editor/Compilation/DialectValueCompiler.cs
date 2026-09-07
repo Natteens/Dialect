@@ -57,8 +57,30 @@ namespace Dialect.Editor
 
         public static bool IsTextType(Type type) => type == typeof(string) || type == typeof(LocalizedString) || type == typeof(DialectText);
 
-        static DialectValueResolver CompileConnectedValue(DialectGraph graph, IPort output, List<string> diagnostics)
+        public static DialectValueExpression CompileValue(DialectGraph graph, IPort input, Type expectedType, List<string> diagnostics)
         {
+            if (input == null)
+            {
+                diagnostics.Add("A required value port is missing.");
+                return default;
+            }
+            if (!input.IsConnected)
+            {
+                if (!TryReadPortValue(input, expectedType, out var fallback))
+                    diagnostics.Add($"Value input '{input.DisplayName}' could not be read as {expectedType.Name}.");
+                return new DialectValueExpression(fallback);
+            }
+            var output = input.FirstConnectedPort;
+            var resolver = CompileConnectedValue(graph, output, diagnostics);
+            if (resolver == null) return default;
+            if (!expectedType.IsAssignableFrom(resolver.ValueType))
+                diagnostics.Add($"Value connected to '{input.DisplayName}' resolves as {resolver.ValueType.Name}, expected {expectedType.Name}.");
+            return new DialectValueExpression(resolver, output.ID.ToString());
+        }
+
+        public static DialectValueResolver CompileConnectedValue(DialectGraph graph, IPort output, List<string> diagnostics)
+        {
+            if (output == null) { diagnostics.Add("Connected value output is missing."); return null; }
             switch (output.GetNode())
             {
                 case IVariableNode variableNode:
@@ -76,6 +98,19 @@ namespace Dialect.Editor
                     diagnostics.Add($"{output.GetNode().Title} does not implement IDialectValueNodeCompiler.");
                     return null;
             }
+        }
+
+        static bool TryReadPortValue(IPort input, Type type, out DialectValue value)
+        {
+            if (type == typeof(string) && input.TryGetValue(out string text)) { value = new DialectStringValue(text); return true; }
+            if (type == typeof(LocalizedString) && input.TryGetValue(out LocalizedString localized)) { value = new DialectLocalizedStringValue(localized); return true; }
+            if (type == typeof(bool) && input.TryGetValue(out bool boolean)) { value = new DialectBoolValue(boolean); return true; }
+            if (type == typeof(int) && input.TryGetValue(out int integer)) { value = new DialectIntValue(integer); return true; }
+            if (type == typeof(float) && input.TryGetValue(out float number)) { value = new DialectFloatValue(number); return true; }
+            if (typeof(UnityEngine.Object).IsAssignableFrom(type) && input.TryGetValue(out UnityEngine.Object asset))
+            { value = new DialectObjectValue(asset); return true; }
+            value = null;
+            return false;
         }
 
         static void ValidateLocalization(DialectText text, string label, Action<string> error)
@@ -111,7 +146,11 @@ namespace Dialect.Editor
             if (constant.TryGetValue(out string text)) return new DialectConstantValueResolver(new DialectStringValue(text));
             if (constant.TryGetValue(out LocalizedString localized)) return new DialectConstantValueResolver(new DialectLocalizedStringValue(localized));
             if (constant.TryGetValue(out DialectText authored)) return new DialectAuthoredTextResolver(authored);
-            diagnostics.Add($"Constant uses unsupported type {constant.DataType.Name} for dialogue text.");
+            if (constant.TryGetValue(out bool boolean)) return new DialectConstantValueResolver(new DialectBoolValue(boolean));
+            if (constant.TryGetValue(out int integer)) return new DialectConstantValueResolver(new DialectIntValue(integer));
+            if (constant.TryGetValue(out float number)) return new DialectConstantValueResolver(new DialectFloatValue(number));
+            if (constant.TryGetValue(out UnityEngine.Object asset)) return new DialectConstantValueResolver(new DialectObjectValue(asset));
+            diagnostics.Add($"Constant uses unsupported type {constant.DataType.Name}.");
             return null;
         }
 

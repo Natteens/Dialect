@@ -7,14 +7,15 @@ using Unity.GraphToolkit.Editor;
 
 namespace Dialect.Editor.Nodes
 {
-    [Serializable, Node("Dialogue", null, "Choice")]
+    [Serializable, Node("Dialogue", null, "Choice", "Packages/com.natteens.dialect/Editor/Styles/DialectNodes.uss")]
     public sealed class ChoiceNode : DialectNode, IDialectNodeCompiler
     {
-        const string CountOption = "choiceCount";
+        public const string CountOption = "choiceCount";
         const string Prefix = "choice";
         protected override void OnDefineOptions(IOptionDefinitionContext context) =>
-            context.AddOption(CountOption, typeof(int)).WithDisplayName("Choice Count")
-                .WithTooltip("Number of choices shown to the player.").WithDefaultValue(2);
+            context.AddOption<DialectPortCount>(CountOption).WithDisplayName("Choices")
+                .WithTooltip("Add or remove choices without remapping existing outputs.")
+                .WithDefaultValue(new DialectPortCount(2));
         protected override void OnDefinePorts(IPortDefinitionContext context)
         {
             DefaultColor = new UnityEngine.Color(.84f, .48f, .18f);
@@ -23,7 +24,7 @@ namespace Dialect.Editor.Nodes
             var count = GetCount();
             for (var i = 0; i < count; i++)
             {
-                AddValueInput<DialectText>(context, TextName(i), $"Choice {i + 1}");
+                AddValueInput<DialectText>(context, TextName(i), $"Choice {i + 1}", "Inline or Localized choice text; a wire overrides the default.");
                 AddFlowOutput(context, TargetName(i), $"Choice {i + 1}");
             }
         }
@@ -31,11 +32,12 @@ namespace Dialect.Editor.Nodes
         {
             var choices = new List<DialectChoiceDefinition>();
             for (var i = 0; i < GetCount(); i++)
-                choices.Add(new DialectChoiceDefinition(context.ReadText(TextName(i)), context.Target(TargetName(i))));
+                choices.Add(new DialectChoiceDefinition(context.ReadRequiredText(TextName(i), $"Choice {i + 1}"), context.Target(TargetName(i))));
             return new ChoiceRuntimeNode(choices);
         }
         public void Validate(DialectNodeValidationContext context)
         {
+            if (!context.IsStrict) return;
             if (GetCount() < 1) context.Error("Add at least one choice.");
             for (var i = 0; i < GetCount(); i++)
             {
@@ -44,7 +46,12 @@ namespace Dialect.Editor.Nodes
             }
         }
         public bool WaitsForInput => true;
-        int GetCount() { var count = 2; GetNodeOptionByName(CountOption)?.TryGetValue(out count); return Math.Clamp(count, 1, 8); }
+        int GetCount()
+        {
+            var value = new DialectPortCount(2);
+            GetNodeOptionByName(CountOption)?.TryGetValue(out value);
+            return value.Count;
+        }
         public static string TextName(int index) => $"{Prefix}{index}Text";
         public static string TargetName(int index) => $"{Prefix}{index}Target";
     }

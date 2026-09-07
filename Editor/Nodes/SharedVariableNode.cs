@@ -5,7 +5,7 @@ using Unity.GraphToolkit.Editor;
 
 namespace Dialect.Editor.Nodes
 {
-    [Serializable, Node("Dialogue/Values", null, "Shared Variable")]
+    [Serializable, Node("Values", null, "Shared Variable", "Packages/com.natteens.dialect/Editor/Styles/DialectNodes.uss")]
     public sealed class SharedVariableNode : DialectValueNode, IDialectValueNodeCompiler
     {
         public const string ReferencePort = "reference";
@@ -14,12 +14,25 @@ namespace Dialect.Editor.Nodes
         {
             DefaultColor = new UnityEngine.Color(.42f, .55f, .72f);
             Subtitle = "Shared blackboard";
-            Tooltip = "Reads a String or LocalizedString from a shared Dialect Blackboard.";
+            Tooltip = "Reads a typed session value from a shared Dialect Blackboard.";
             AddValueInput<DialectVariableReference>(context, ReferencePort, "Variable");
             AddValueOutput<DialectText>(context);
         }
 
-        public Type ValueType => typeof(DialectText);
+        public Type ValueType => TryGetResolvedType(out var type) ? type : typeof(DialectText);
+
+        internal bool TryGetResolvedType(out Type type)
+        {
+            var port = GetInputPortByName(ReferencePort);
+            if (port != null && port.TryGetValue(out DialectVariableReference reference) && reference.IsValid &&
+                reference.Blackboard.TryGetDefinition(reference.VariableId, out var definition))
+            {
+                type = DialectValueUtility.GetSystemType(definition.Type);
+                return true;
+            }
+            type = typeof(DialectText);
+            return false;
+        }
 
         public DialectValueResolver CompileValue(DialectValueNodeCompilationContext context)
         {
@@ -28,20 +41,18 @@ namespace Dialect.Editor.Nodes
             { context.Error("Select a valid shared variable."); return null; }
             if (!context.Graph.IsBlackboardLinked(reference.Blackboard))
             { context.Error("Link the referenced blackboard to this graph."); return null; }
-            if (definition.Type is not (DialectValueType.String or DialectValueType.LocalizedString))
-            { context.Error("Dialogue text requires a String or LocalizedString variable."); return null; }
             return new DialectVariableValueResolver(definition.Id, definition.Type);
         }
 
         public void Validate(DialectValueNodeValidationContext context)
         {
+            if (!context.IsStrict) return;
             var reference = context.Read<DialectVariableReference>(ReferencePort);
             if (!reference.IsValid) context.Error("Select a valid shared variable.");
             else if (!context.Graph.IsBlackboardLinked(reference.Blackboard))
                 context.Error("Link the referenced blackboard to this graph.");
-            else if (reference.Blackboard.TryGetDefinition(reference.VariableId, out var definition) &&
-                     definition.Type is not (DialectValueType.String or DialectValueType.LocalizedString))
-                context.Error("Shared text variables must be String or LocalizedString.");
+            else if (!reference.Blackboard.TryGetDefinition(reference.VariableId, out _))
+                context.Error("The selected shared variable no longer exists.");
         }
     }
 }

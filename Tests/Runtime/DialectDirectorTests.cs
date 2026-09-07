@@ -5,6 +5,7 @@ using Dialect.Conditions;
 using Dialect.Core;
 using Dialect.Executors;
 using Dialect.Nodes;
+using Dialect.Values;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.Localization;
@@ -14,13 +15,44 @@ namespace Dialect.Tests
 {
     public sealed class DialectDirectorTests
     {
+        sealed class TestLocalesProvider : ILocalesProvider
+        {
+            public List<Locale> Locales { get; } = new();
+
+            public Locale GetLocale(LocaleIdentifier id)
+            {
+                foreach (var locale in Locales)
+                    if (locale != null && locale.Identifier == id) return locale;
+                return null;
+            }
+
+            public void AddLocale(Locale locale)
+            {
+                if (locale != null && !Locales.Contains(locale)) Locales.Add(locale);
+            }
+
+            public bool RemoveLocale(Locale locale) => Locales.Remove(locale);
+        }
+
         GameObject owner;
         DialectDirector director;
+        LocalizationSettings originalLocalizationSettings;
         readonly List<Object> assets = new();
 
         [SetUp]
         public void SetUp()
         {
+            originalLocalizationSettings = LocalizationSettings.Instance;
+            var settings = ScriptableObject.CreateInstance<LocalizationSettings>();
+            var baselineLocale = Locale.CreateLocale("en");
+            assets.Add(settings);
+            assets.Add(baselineLocale);
+            LocalizationSettings.Instance = settings;
+            LocalizationSettings.AvailableLocales = new TestLocalesProvider();
+            LocalizationSettings.AvailableLocales.AddLocale(baselineLocale);
+            LocalizationSettings.StartupLocaleSelectors.Clear();
+            LocalizationSettings.StartupLocaleSelectors.Add(new SpecificLocaleSelector { LocaleId = baselineLocale.Identifier });
+            LocalizationSettings.SelectedLocale = baselineLocale;
             owner = new GameObject("Dialect Director Test");
             director = owner.AddComponent<DialectDirector>();
         }
@@ -29,6 +61,7 @@ namespace Dialect.Tests
         public void TearDown()
         {
             if (owner != null) Object.DestroyImmediate(owner);
+            LocalizationSettings.Instance = originalLocalizationSettings;
             foreach (var asset in assets) Object.DestroyImmediate(asset);
             assets.Clear();
         }
@@ -310,6 +343,8 @@ namespace Dialect.Tests
             var second = Locale.CreateLocale("x-dialect-b");
             assets.Add(first);
             assets.Add(second);
+            LocalizationSettings.AvailableLocales.AddLocale(first);
+            LocalizationSettings.AvailableLocales.AddLocale(second);
             var callbacks = 0;
             director.LinePresented += _ => callbacks++;
             try
@@ -332,6 +367,7 @@ namespace Dialect.Tests
             var original = LocalizationSettings.SelectedLocale;
             var locale = Locale.CreateLocale("x-dialect-choice");
             assets.Add(locale);
+            LocalizationSettings.AvailableLocales.AddLocale(locale);
             var callbacks = 0;
             director.ChoicesPresented += _ => callbacks++;
             try
@@ -352,6 +388,7 @@ namespace Dialect.Tests
             var original = LocalizationSettings.SelectedLocale;
             var locale = Locale.CreateLocale("x-dialect-stopped");
             assets.Add(locale);
+            LocalizationSettings.AvailableLocales.AddLocale(locale);
             var callbacks = 0;
             director.LinePresented += _ => callbacks++;
             try
@@ -362,6 +399,89 @@ namespace Dialect.Tests
                 Assert.That(callbacks, Is.EqualTo(1));
             }
             finally { LocalizationSettings.SelectedLocale = original; }
+        }
+
+        [Test]
+        public void BranchUsesBooleanExpressionAndTakesOnlyMatchingPath()
+        {
+            DialectLine line = default;
+            director.LinePresented += value => line = value;
+            director.Play(Graph(
+                new BranchRuntimeNode(new DialectValueExpression(new DialectBoolValue(true)), 1, 2),
+                new DialogueRuntimeNode(default, DialectText.Inline("True"), 3),
+                new DialogueRuntimeNode(default, DialectText.Inline("False"), 3),
+                new EndRuntimeNode()));
+            Assert.That(line.Text, Is.EqualTo("True"));
+            Assert.That(director.Session.CurrentNodeIndex, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void SetVariableChangesSessionWithoutMutatingDefinition()
+        {
+            var definition = new DialectVariableDefinition("score-id", "Score", new DialectIntValue(2));
+            var graph = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
+            graph.Configure(System.Guid.NewGuid().ToString("N"), 0,
+                new List<RuntimeNode>
+                {
+                    new SetVariableRuntimeNode(definition.Id, DialectValueType.Integer,
+                        new DialectValueExpression(new DialectIntValue(9)), 1),
+                    new EndRuntimeNode()
+                }, new List<DialectVariableDefinition> { definition }, null, null, new List<string>());
+            assets.Add(graph);
+            director.Play(graph);
+            Assert.That(director.Session.Variables.TryGet(definition.Id, out int value), Is.True);
+            Assert.That(value, Is.EqualTo(9));
+            Assert.That(((DialectIntValue)definition.DefaultValue).Value, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void RandomBranchIsRepeatableForDirectorSeed()
+        {
+            string first = null;
+            string second = null;
+            director.RandomSeed = 42;
+            director.LinePresented += line =>
+            {
+                if (first == null) first = line.Text;
+                else second = line.Text;
+            };
+            RuntimeNode[] Nodes() => new RuntimeNode[]
+            {
+                new RandomBranchRuntimeNode(new List<int> { 1, 2, 3 }),
+                new DialogueRuntimeNode(default, DialectText.Inline("A"), 4),
+                new DialogueRuntimeNode(default, DialectText.Inline("B"), 4),
+                new DialogueRuntimeNode(default, DialectText.Inline("C"), 4),
+                new EndRuntimeNode()
+            };
+            director.Play(Graph(Nodes()));
+            director.Stop();
+            director.Play(Graph(Nodes()));
+            Assert.That(second, Is.EqualTo(first));
+        }
+
+        [Test]
+        public void SessionRetainsCurrentVisualizationStateForLateReplay()
+        {
+            var start = new StartRuntimeNode(1);
+            var dialogue = new DialogueRuntimeNode(default,
+                new DialectTextExpression(new DialectConstantValueResolver(new DialectStringValue("Stateful line")), "line-port"), 2);
+            var end = new EndRuntimeNode();
+            start.SetAuthoringId("start-node");
+            dialogue.SetAuthoringId("dialogue-node");
+            end.SetAuthoringId("end-node");
+            var transition = new DialectTransition(0, 1, "start-output", "dialogue-input");
+            var graph = ScriptableObject.CreateInstance<DialectRuntimeGraph>();
+            graph.Configure(System.Guid.NewGuid().ToString("N"), 0,
+                new List<RuntimeNode> { start, dialogue, end }, null, null,
+                new List<DialectTransition> { transition, new(1, 2, "dialogue-output", "end-input") }, new List<string>());
+            assets.Add(graph);
+
+            director.Play(graph);
+
+            Assert.That(director.Session.CurrentNodeId, Is.EqualTo("dialogue-node"));
+            Assert.That(director.Session.LastTransition, Is.EqualTo(transition));
+            Assert.That(director.Session.ValuePreviews["line-port"], Is.EqualTo("Stateful line"));
+            Assert.That(director.Session.State, Is.EqualTo(DialectPlaybackState.WaitingForAdvance));
         }
 
         public sealed class FixedCondition : DialectCondition

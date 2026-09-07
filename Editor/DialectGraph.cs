@@ -13,6 +13,7 @@ namespace Dialect.Editor
     {
         public const string AssetExtension = "dlg";
         [SerializeField] List<DialectBlackboard> blackboards = new();
+        [System.NonSerialized] bool strictValidationRequested;
         public IReadOnlyList<DialectBlackboard> Blackboards => blackboards;
 
         public bool LinkBlackboard(DialectBlackboard blackboard)
@@ -56,16 +57,27 @@ namespace Dialect.Editor
             var input = source.Direction == PortDirection.Input ? source : destination;
             var output = source.Direction == PortDirection.Output ? source : destination;
             if (input.IsConnected) return false;
+            if (output.GetNode() is SharedVariableNode shared && shared.TryGetResolvedType(out var sharedType))
+            {
+                if (input.DataType == typeof(DialectText)) return DialectValueCompiler.IsTextType(sharedType);
+                return input.DataType.IsAssignableFrom(sharedType);
+            }
             if (input.DataType == typeof(DialectText) && DialectValueCompiler.IsTextType(output.DataType)) return true;
             return input.DataType.IsAssignableFrom(output.DataType);
         }
 
         public override void OnGraphChanged(GraphLogger logger)
         {
-            Validate(logger);
+            var mode = strictValidationRequested ? DialectValidationMode.Strict : DialectValidationMode.Live;
+            strictValidationRequested = false;
+            Validate(logger, mode);
         }
 
-        public void Validate(GraphLogger logger)
+        public void RequestStrictValidation() => strictValidationRequested = true;
+
+        public void Validate(GraphLogger logger) => Validate(logger, DialectValidationMode.Strict);
+
+        public void Validate(GraphLogger logger, DialectValidationMode mode)
         {
             var nodes = GetNodes().ToList();
             var starts = nodes.OfType<StartNode>().ToList();
@@ -80,18 +92,18 @@ namespace Dialect.Editor
 
             foreach (var node in nodes.OfType<DialectNode>())
             {
-                if (node is IDialectNodeCompiler compiler) compiler.Validate(new DialectNodeValidationContext(this, node, logger));
+                if (node is IDialectNodeCompiler compiler) compiler.Validate(new DialectNodeValidationContext(this, node, logger, mode));
                 else logger.LogError($"{node.Title} does not implement IDialectNodeCompiler.", node);
             }
 
             foreach (var node in nodes.OfType<DialectValueNode>())
             {
                 if (node is IDialectValueNodeCompiler compiler)
-                    compiler.Validate(new DialectValueNodeValidationContext(this, node, logger));
+                    compiler.Validate(new DialectValueNodeValidationContext(this, node, logger, mode));
                 else logger.LogError($"{node.Title} does not implement IDialectValueNodeCompiler.", node);
             }
 
-            if (starts.Count != 1) return;
+            if (mode != DialectValidationMode.Strict || starts.Count != 1) return;
             var reachable = FindReachable(starts[0]);
             foreach (var node in nodes.OfType<DialectNode>().Where(node => !reachable.Contains(node)))
                 logger.LogWarning($"{node.Title} is unreachable from Start.", node);

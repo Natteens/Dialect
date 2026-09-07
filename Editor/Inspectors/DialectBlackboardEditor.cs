@@ -17,16 +17,15 @@ namespace Dialect.Editor.Inspectors
             var variables = serializedObject.FindProperty("variables");
             list = new ReorderableList(serializedObject, variables, true, true, false, true)
             {
-                drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Variables"),
+                drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Variables — Name, Type, Default Value"),
                 elementHeightCallback = index => Matches(variables.GetArrayElementAtIndex(index))
                     ? EditorGUI.GetPropertyHeight(variables.GetArrayElementAtIndex(index), true) + 6 : 0,
                 drawElementCallback = (rect, index, active, focused) =>
                 {
                     var element = variables.GetArrayElementAtIndex(index);
                     if (!Matches(element)) return;
-                    var name = element.FindPropertyRelative("name").stringValue;
                     rect.y += 2;
-                    EditorGUI.PropertyField(rect, element, new GUIContent(string.IsNullOrWhiteSpace(name) ? "Unnamed" : name), true);
+                    EditorGUI.PropertyField(rect, element, GUIContent.none, true);
                 }
             };
         }

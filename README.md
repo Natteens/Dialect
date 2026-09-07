@@ -11,15 +11,16 @@ Graph Toolkit ships with Unity 6000.6, so Dialect does not declare an old experi
 
 ## Features
 
-- `.dlg` graphs with Start, Dialogue, Choice, Condition, Action, and End
+- `.dlg` graphs with Start, Dialogue, Choice, Branch, Random Branch, Condition, Action, Set Variable, and End
 - local Graph Toolkit variables and reusable `DialectBlackboard` assets
 - string, `LocalizedString`, bool, int, float, and Unity Object values
-- inline, localized, local, shared, constant, and custom connected speaker/text values
+- inline, localized, local, shared, constant, and custom connected typed values
 - per-session overrides, snapshots, and restore without mutating assets
 - public custom flow and value-node SDKs
-- GraphLogger diagnostics and safe Create Start/Create End fixes
-- Validate, Shared Boards, and Debug graph toolbar controls
-- current-node, traversed-wire, and compact port-value visualization
+- direct Inline/Localized Dialogue and Choice authoring through a UI Toolkit drawer
+- quiet live structural diagnostics plus explicit strict validation
+- Validate, Shared Boards, and Runtime Debug graph toolbar controls
+- state-replayed current-node, traversed-wire, and compact port-value visualization
 - a Play Mode Director Inspector and a complete UI Toolkit sample
 
 ## Installation
@@ -33,7 +34,7 @@ https://github.com/Natteens/Dialect.git
 ## Quick start
 
 1. Create **Assets > Create > Dialect > Dialogue Graph**. Dialect creates a connected Start and End.
-2. Add Dialogue or Choice nodes and connect their flow.
+2. Insert a Dialogue, type Speaker and Line directly in its Inline fields, and connect the flow.
 3. Add `DialectDirector` to a scene object and assign the imported `.dlg` asset.
 4. Subscribe a UI adapter and call `Advance`, `Choose`, or `Resume` only when valid.
 

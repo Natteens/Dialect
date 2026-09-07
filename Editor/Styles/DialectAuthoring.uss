@@ -1,0 +1,43 @@
+.dialect-text,
+.dialect-variable-reference,
+.dialect-variable-target,
+.dialect-variable-definition {
+    flex-grow: 1;
+    min-width: 150px;
+}
+
+.dialect-text__mode {
+    margin-bottom: 3px;
+}
+
+.dialect-text__inline .unity-text-field__input {
+    min-height: 52px;
+    max-height: 92px;
+    white-space: normal;
+}
+
+.dialect-text__localized,
+.dialect-text__variable {
+    margin-top: 2px;
+}
+
+.dialect-count {
+    flex-direction: row;
+    align-items: center;
+}
+
+.dialect-count__number {
+    min-width: 22px;
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+}
+
+.dialect-count Button {
+    margin-left: 3px;
+    min-height: 20px;
+}
+
+.dialect-variable-definition {
+    padding-top: 4px;
+    padding-bottom: 6px;
+}

@@ -50,7 +50,9 @@ namespace Dialect.Editor.AssetImport
             if (starts.Count != 1) diagnostics.Add($"Expected exactly one Start node, found {starts.Count}.");
             if (!authoringNodes.OfType<EndNode>().Any()) diagnostics.Add("Expected at least one End node.");
             var entry = starts.Count == 1 ? indices[starts[0]] : -1;
-            runtime.Configure(graph.AssetGuid.ToString(), entry, compiled, localVariables, blackboards,
+            // Runtime visualization is keyed by the authoring graph model ID. The .dlg
+            // asset GUID is a different identifier and cannot resolve a Graph Toolkit view.
+            runtime.Configure(graph.ID.ToString(), entry, compiled, localVariables, blackboards,
                 CompileTransitions(authoringNodes, indices), diagnostics);
             AddRuntime(context, runtime);
         }

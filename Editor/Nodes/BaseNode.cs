@@ -7,6 +7,8 @@ using Unity.GraphToolkit.Editor;
 
 namespace Dialect.Editor.Nodes
 {
+    public enum DialectValidationMode { Live, Strict }
+
     [Serializable]
     public abstract class DialectNode : Node
     {
@@ -20,6 +22,9 @@ namespace Dialect.Editor.Nodes
                 .WithCapacity(PortCapacity.Single).Build();
         protected static void AddValueInput<T>(IPortDefinitionContext context, string name, string label) =>
             context.AddInputPort<T>(name).WithDisplayName(label).WithConnectorUI(PortConnectorUI.Circle)
+                .WithCapacity(PortCapacity.Single).Build();
+        protected static void AddValueInput<T>(IPortDefinitionContext context, string name, string label, string tooltip) =>
+            context.AddInputPort<T>(name).WithDisplayName(label).WithTooltip(tooltip).WithConnectorUI(PortConnectorUI.Circle)
                 .WithCapacity(PortCapacity.Single).Build();
 
         protected static void AddValueOutput<T>(IPortDefinitionContext context, string name, string label) =>
@@ -64,6 +69,14 @@ namespace Dialect.Editor.Nodes
         public T Read<T>(string portName) => NodeUtility.GetInputPortValue<T>(Node.GetInputPortByName(portName));
         public DialectTextExpression ReadText(string portName) =>
             DialectValueCompiler.CompileText(Graph, Node.GetInputPortByName(portName), diagnostics);
+        public DialectTextExpression ReadRequiredText(string portName, string label)
+        {
+            var port = Node.GetInputPortByName(portName);
+            DialectValueCompiler.ValidateText(port, label, Error);
+            return DialectValueCompiler.CompileText(Graph, port, diagnostics);
+        }
+        public DialectValueExpression CompileValue(string portName, Type expectedType) =>
+            DialectValueCompiler.CompileValue(Graph, Node.GetInputPortByName(portName), expectedType, diagnostics);
         public int Target(string portName, bool required = true)
         {
             var port = Node.GetOutputPortByName(portName);
@@ -89,10 +102,12 @@ namespace Dialect.Editor.Nodes
     public sealed class DialectNodeValidationContext
     {
         readonly GraphLogger logger;
-        internal DialectNodeValidationContext(DialectGraph graph, DialectNode node, GraphLogger logger)
-        { Graph = graph; Node = node; this.logger = logger; }
+        internal DialectNodeValidationContext(DialectGraph graph, DialectNode node, GraphLogger logger, DialectValidationMode mode)
+        { Graph = graph; Node = node; this.logger = logger; Mode = mode; }
         public DialectGraph Graph { get; }
         public DialectNode Node { get; }
+        public DialectValidationMode Mode { get; }
+        public bool IsStrict => Mode == DialectValidationMode.Strict;
         public bool IsConnected(string portName)
         {
             var port = Node.GetInputPortByName(portName) ?? Node.GetOutputPortByName(portName);
@@ -108,10 +123,12 @@ namespace Dialect.Editor.Nodes
     public sealed class DialectValueNodeValidationContext
     {
         readonly GraphLogger logger;
-        internal DialectValueNodeValidationContext(DialectGraph graph, Node node, GraphLogger logger)
-        { Graph = graph; Node = node; this.logger = logger; }
+        internal DialectValueNodeValidationContext(DialectGraph graph, Node node, GraphLogger logger, DialectValidationMode mode)
+        { Graph = graph; Node = node; this.logger = logger; Mode = mode; }
         public DialectGraph Graph { get; }
         public Node Node { get; }
+        public DialectValidationMode Mode { get; }
+        public bool IsStrict => Mode == DialectValidationMode.Strict;
         public T Read<T>(string portName) => NodeUtility.GetInputPortValue<T>(Node.GetInputPortByName(portName));
         public void Error(string message) => logger.LogError(message, Node);
         public void Warning(string message) => logger.LogWarning(message, Node);
