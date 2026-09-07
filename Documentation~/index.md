@@ -12,6 +12,5 @@ Dialect separates Graph Toolkit authoring, compiled runtime data, per-play sessi
 - [Custom flow and value nodes](custom-nodes.md)
 - [Validation](validation.md)
 - [Runtime debugging](debugging.md)
-- [Samples](samples.md)
 
 Dialect requires Unity 6000.6 or newer and Unity Localization 1.5.9 or newer.

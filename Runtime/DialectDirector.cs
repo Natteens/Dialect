@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using Dialect.Blackboards;
 using Dialect.Core;
 using Dialect.Executors;
+using Dialect.Nodes;
+using Dialect.Values;
 using UnityEngine;
 using UnityEngine.Localization;
 using UnityEngine.Localization.Settings;
@@ -21,6 +24,8 @@ namespace Dialect
         bool dispatchingChoices;
         PendingCommand pendingCommand;
         int pendingChoice = -1;
+        CancellationTokenSource sessionCancellation;
+        int sessionGeneration;
 
         enum PendingCommand { None, Advance, Choice, Stop }
 
@@ -62,6 +67,8 @@ namespace Dialect
 #endif
         }
 
+        void OnDestroy() => CancelSessionOperations();
+
         public void Play() => Play(defaultGraph, null);
         public void Play(DialectRuntimeGraph graph) => Play(graph, null);
 
@@ -97,6 +104,7 @@ namespace Dialect
             if (IsRunning) Terminate(DialectTerminationReason.Interrupted, DialectPlaybackState.Ended);
             pendingCommand = PendingCommand.None;
             pendingChoice = -1;
+            BeginSessionOperations();
             Session = new DialectSession(graph, variables, userData, randomSeed);
             SessionStarted?.Invoke(Session);
             Pump();
@@ -139,7 +147,11 @@ namespace Dialect
 
         public bool Resume()
         {
-            if (Session?.State != DialectPlaybackState.Suspended) return false;
+            if (Session?.State != DialectPlaybackState.Suspended ||
+                Session.SuspensionKind == DialectSuspensionKind.Automatic) return false;
+            if (Session.PendingTarget >= 0) MoveTo(Session.PendingTarget);
+            Session.PendingTarget = -1;
+            Session.SuspensionKind = DialectSuspensionKind.None;
             Session.State = DialectPlaybackState.Running;
             Pump();
             return true;
@@ -165,8 +177,99 @@ namespace Dialect
 
         internal void ReportResolvedValue(string portId, string value)
         {
-            Session?.SetValuePreview(portId, value);
-            ValueResolved?.Invoke(Session, new DialectValuePreview(portId, value));
+            if (Session?.SetValuePreview(portId, value) == true)
+                ValueResolved?.Invoke(Session, new DialectValuePreview(portId, value));
+        }
+
+        internal void BeginWait(DialectSession session, float duration, WaitTimeMode timeMode, int target)
+        {
+            var generation = sessionGeneration;
+            var token = sessionCancellation.Token;
+            RunWait(session, generation, duration, timeMode, target, token);
+        }
+
+        internal void BeginWaitUntil(DialectSession session, DialectValueExpression condition,
+            DialectExecutionContext context, int target)
+        {
+            var generation = sessionGeneration;
+            var token = sessionCancellation.Token;
+            RunWaitUntil(session, generation, condition, context, target, token);
+        }
+
+        async void RunWait(DialectSession session, int generation, float duration, WaitTimeMode timeMode,
+            int target, CancellationToken token)
+        {
+            try
+            {
+                if (timeMode == WaitTimeMode.Scaled)
+                    await Awaitable.WaitForSecondsAsync(duration, token);
+                else
+                {
+                    var elapsed = 0f;
+                    while (elapsed < duration)
+                    {
+                        await Awaitable.NextFrameAsync(token);
+                        elapsed += Time.unscaledDeltaTime;
+                    }
+                }
+                ContinueAutomaticSuspension(session, generation, target);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception exception) { FaultAutomaticSuspension(session, generation, exception.Message); }
+        }
+
+        async void RunWaitUntil(DialectSession session, int generation, DialectValueExpression condition,
+            DialectExecutionContext context, int target, CancellationToken token)
+        {
+            try
+            {
+                while (true)
+                {
+                    await Awaitable.NextFrameAsync(token);
+                    if (condition.Resolve(context) is not bool ready)
+                        throw new InvalidOperationException("Wait Until Condition must resolve to Boolean.");
+                    if (ready) break;
+                }
+                ContinueAutomaticSuspension(session, generation, target);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception exception) { FaultAutomaticSuspension(session, generation, exception.Message); }
+        }
+
+        void ContinueAutomaticSuspension(DialectSession session, int generation, int target)
+        {
+            if (!IsCurrentAutomaticSuspension(session, generation, target)) return;
+            MoveTo(target);
+            session.PendingTarget = -1;
+            session.SuspensionKind = DialectSuspensionKind.None;
+            session.State = DialectPlaybackState.Running;
+            Pump();
+        }
+
+        void FaultAutomaticSuspension(DialectSession session, int generation, string message)
+        {
+            if (!IsCurrentAutomaticSuspension(session, generation, session.PendingTarget)) return;
+            Fault(message, DialectTerminationReason.ExecutionError);
+        }
+
+        bool IsCurrentAutomaticSuspension(DialectSession session, int generation, int target) =>
+            ReferenceEquals(Session, session) && sessionGeneration == generation &&
+            session.State == DialectPlaybackState.Suspended &&
+            session.SuspensionKind == DialectSuspensionKind.Automatic && session.PendingTarget == target;
+
+        void BeginSessionOperations()
+        {
+            CancelSessionOperations();
+            sessionGeneration++;
+            sessionCancellation = new CancellationTokenSource();
+        }
+
+        void CancelSessionOperations()
+        {
+            if (sessionCancellation == null) return;
+            sessionCancellation.Cancel();
+            sessionCancellation.Dispose();
+            sessionCancellation = null;
         }
 
         void Pump()
@@ -211,7 +314,11 @@ namespace Dialect
                     Session.State = DialectPlaybackState.WaitingForAdvance;
                     break;
                 case DialectExecutionKind.AwaitChoice: Session.State = DialectPlaybackState.WaitingForChoice; break;
-                case DialectExecutionKind.Suspended: Session.State = DialectPlaybackState.Suspended; break;
+                case DialectExecutionKind.Suspended:
+                    Session.PendingTarget = result.TargetNodeIndex;
+                    Session.SuspensionKind = result.SuspensionKind;
+                    Session.State = DialectPlaybackState.Suspended;
+                    break;
                 case DialectExecutionKind.End: Terminate(DialectTerminationReason.Completed, DialectPlaybackState.Ended); break;
             }
         }
@@ -250,6 +357,7 @@ namespace Dialect
 
         void Fault(string message, DialectTerminationReason reason)
         {
+            CancelSessionOperations();
             Session.State = DialectPlaybackState.Faulted;
             Session.TerminationReason = reason;
             SessionFaulted?.Invoke(Session, message);
@@ -259,11 +367,13 @@ namespace Dialect
         void Terminate(DialectTerminationReason reason, DialectPlaybackState state)
         {
             if (Session == null) return;
+            CancelSessionOperations();
             Session.State = state;
             Session.TerminationReason = reason;
             Session.CurrentLine = default;
             Session.CurrentChoices = null;
             Session.PendingTarget = -1;
+            Session.SuspensionKind = DialectSuspensionKind.None;
             SessionEnded?.Invoke(Session, reason);
         }
     }

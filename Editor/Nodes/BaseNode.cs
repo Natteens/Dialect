@@ -96,6 +96,8 @@ namespace Dialect.Editor.Nodes
         public DialectGraph Graph { get; }
         public Node Node { get; }
         public T Read<T>(string portName) => NodeUtility.GetInputPortValue<T>(Node.GetInputPortByName(portName));
+        public DialectValueExpression CompileValue(string portName, Type expectedType) =>
+            DialectValueCompiler.CompileValue(Graph, Node.GetInputPortByName(portName), expectedType, diagnostics);
         public void Error(string message) => diagnostics.Add($"{Node.Title}: {message}");
     }
 
@@ -129,6 +131,7 @@ namespace Dialect.Editor.Nodes
         public Node Node { get; }
         public DialectValidationMode Mode { get; }
         public bool IsStrict => Mode == DialectValidationMode.Strict;
+        public bool IsConnected(string portName) => Node.GetInputPortByName(portName)?.IsConnected == true;
         public T Read<T>(string portName) => NodeUtility.GetInputPortValue<T>(Node.GetInputPortByName(portName));
         public void Error(string message) => logger.LogError(message, Node);
         public void Warning(string message) => logger.LogWarning(message, Node);

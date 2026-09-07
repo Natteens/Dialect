@@ -1,6 +1,0 @@
-{
-  "name": "Dialect.CompleteDemo",
-  "rootNamespace": "Dialect.Samples.Complete",
-  "references": ["Dialect"],
-  "autoReferenced": true
-}

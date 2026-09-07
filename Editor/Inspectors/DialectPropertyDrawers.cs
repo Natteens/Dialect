@@ -3,6 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using Dialect.Blackboards;
 using Dialect.Editor.Nodes;
+using Dialect.Values;
 using Unity.GraphToolkit.Editor;
 using UnityEditor;
 using UnityEditor.UIElements;
@@ -279,6 +280,59 @@ namespace Dialect.Editor.Inspectors
         }
     }
 
+    [CustomPropertyDrawer(typeof(DialectCompareSettings))]
+    public sealed class DialectCompareSettingsDrawer : PropertyDrawer
+    {
+        public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        {
+            var root = DrawerUI.Root("dialect-compare-settings");
+            var type = property.FindPropertyRelative("type");
+            var comparisonOperator = property.FindPropertyRelative("comparisonOperator");
+            var typeField = new EnumField("Type", (DialectCompareType)type.enumValueIndex);
+            var operatorField = new DropdownField("Operator");
+            root.Add(typeField);
+            root.Add(operatorField);
+            void RefreshOperators()
+            {
+                var selectedType = (DialectCompareType)type.enumValueIndex;
+                var choices = Enum.GetValues(typeof(DialectComparisonOperator)).Cast<DialectComparisonOperator>()
+                    .Where(value => CompareValueResolver.IsSupported(selectedType, value)).ToList();
+                var normalized = CompareValueResolver.Normalize(selectedType,
+                    (DialectComparisonOperator)comparisonOperator.enumValueIndex);
+                comparisonOperator.enumValueIndex = (int)normalized;
+                operatorField.choices = choices.Select(DisplayName).ToList();
+                operatorField.value = DisplayName(normalized);
+                property.serializedObject.ApplyModifiedProperties();
+            }
+            typeField.RegisterValueChangedCallback(evt =>
+            {
+                type.enumValueIndex = (int)(DialectCompareType)evt.newValue;
+                RefreshOperators();
+            });
+            operatorField.RegisterValueChangedCallback(evt =>
+            {
+                var selectedType = (DialectCompareType)type.enumValueIndex;
+                foreach (DialectComparisonOperator value in Enum.GetValues(typeof(DialectComparisonOperator)))
+                    if (CompareValueResolver.IsSupported(selectedType, value) && DisplayName(value) == evt.newValue)
+                    {
+                        comparisonOperator.enumValueIndex = (int)value;
+                        property.serializedObject.ApplyModifiedProperties();
+                        break;
+                    }
+            });
+            RefreshOperators();
+            return root;
+        }
+
+        static string DisplayName(DialectComparisonOperator value) => value switch
+        {
+            DialectComparisonOperator.NotEqual => "Not Equal",
+            DialectComparisonOperator.LessOrEqual => "Less Or Equal",
+            DialectComparisonOperator.GreaterOrEqual => "Greater Or Equal",
+            _ => ObjectNames.NicifyVariableName(value.ToString())
+        };
+    }
+
     [CustomPropertyDrawer(typeof(DialectVariableTarget))]
     public sealed class DialectVariableTargetDrawer : PropertyDrawer
     {
@@ -339,6 +393,37 @@ namespace Dialect.Editor.Inspectors
             public DialectVariableScope Scope { get; }
             public string Id { get; }
             public DialectBlackboard Board { get; }
+        }
+    }
+
+    [CustomPropertyDrawer(typeof(DialectModifySettings))]
+    public sealed class DialectModifySettingsDrawer : PropertyDrawer
+    {
+        public override VisualElement CreatePropertyGUI(SerializedProperty property)
+        {
+            var root = DrawerUI.Root("dialect-modify-settings");
+            var target = property.FindPropertyRelative("target");
+            var operation = property.FindPropertyRelative("numericOperation");
+            var targetField = new PropertyField(target, "Variable");
+            var operationField = new PropertyField(operation, "Operation")
+            {
+                tooltip = "Arithmetic applied to the current session value."
+            };
+            root.Add(targetField);
+            root.Add(operationField);
+            void Refresh()
+            {
+                var graph = DrawerUI.CurrentGraph();
+                var value = target.boxedValue is DialectVariableTarget selected ? selected : default;
+                operationField.style.display = graph != null && value.TryResolve(graph, out _, out _, out var type) &&
+                    type is DialectValueType.Integer or DialectValueType.Float ? DisplayStyle.Flex : DisplayStyle.None;
+            }
+            root.TrackPropertyValue(target.FindPropertyRelative("scope"), _ => Refresh());
+            root.TrackPropertyValue(target.FindPropertyRelative("localVariableId"), _ => Refresh());
+            root.TrackPropertyValue(target.FindPropertyRelative("blackboard"), _ => Refresh());
+            root.TrackPropertyValue(target.FindPropertyRelative("sharedVariableId"), _ => Refresh());
+            Refresh();
+            return root;
         }
     }
 

@@ -53,10 +53,15 @@ namespace Dialect.Core
         public System.Collections.Generic.IReadOnlyDictionary<string, string> ValuePreviews => valuePreviews;
         public int RandomSeed { get; }
         internal int PendingTarget { get; set; } = -1;
+        internal DialectSuspensionKind SuspensionKind { get; set; }
         internal int NextRandom(int maximum) => random.Next(maximum);
-        internal void SetValuePreview(string portId, string value)
+        internal bool SetValuePreview(string portId, string value)
         {
-            if (!string.IsNullOrEmpty(portId)) valuePreviews[portId] = value ?? string.Empty;
+            if (string.IsNullOrEmpty(portId)) return false;
+            value ??= string.Empty;
+            if (valuePreviews.TryGetValue(portId, out var current) && current == value) return false;
+            valuePreviews[portId] = value;
+            return true;
         }
     }
 }

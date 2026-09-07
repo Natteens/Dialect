@@ -14,6 +14,8 @@ Supported built-ins are string, `LocalizedString`, bool, int, float, and `UnityE
 
 **Set Variable** chooses a local or shared variable by its readable name and copies a new value into the session store. It never writes back to the `.dlg` or `DialectBlackboard` asset.
 
+**Modify Variable** uses the same picker and session store. Integer and Float support Add, Subtract, and Multiply; Boolean supports Toggle; String supports Append. Its Operand port is typed and connectable whenever the selected operation needs one. Direct assignment remains the job of Set Variable.
+
 ```csharp
 var overrides = new Dictionary<string, DialectValue>();
 if (graph.TryGetVariableDefinition("PlayerName", out var variable))

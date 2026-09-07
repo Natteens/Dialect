@@ -8,8 +8,8 @@ Press **Validate**, assign the imported `.dlg` to a `DialectDirector`, connect y
 
 Once the basic flow works, switch a text field from **Inline** to **Localized** to choose a String Table entry. Use the native Graph Toolkit blackboard for values that live only in this `.dlg`, and **Shared Boards** for reusable `DialectBlackboard` assets.
 
-The small built-in node set includes Dialogue, Choice, Branch, Random Branch, Condition, Action, Set Variable, Start, and End. Branch and Set Variable cover simple graph logic; Condition and Action remain the reusable ScriptableObject extension points.
+The focused built-in set includes Dialogue and Choice; Start, End, Branch, Random Branch, Wait, Wait Until, and Wait For Resume; Action, Condition, Set Variable, and Modify Variable; and the Shared Variable, Compare, and Select value nodes. Condition, Action, and the custom-node SDK remain the integration points for project-specific behavior.
 
-For a complete working graph, import **Complete Dialogue Demo** from Package Manager. It includes localization, local and shared variables, a custom value node, a condition, an action, choices, and two graphs used by the same Director.
+Dialect does not distribute presentation UI. Subscribe your own UI to Director events and render those payloads with UI Toolkit, uGUI, or another presentation layer.
 
 Continue with [Authoring](authoring.md), [Variables](variables.md), and [Runtime](runtime.md).

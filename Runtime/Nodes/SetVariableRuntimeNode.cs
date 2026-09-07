@@ -25,9 +25,7 @@ namespace Dialect.Nodes
 
         public override DialectExecutionResult Execute(DialectExecutionContext context)
         {
-            var resolved = DialectValueUtility.Create(variableType, value.Resolve(context));
-            if (!context.Variables.TrySet(variableId, resolved))
-                throw new InvalidOperationException("Set Variable could not update its session variable.");
+            VariableRuntimeUtility.Write(context, variableId, variableType, value.Resolve(context));
             return DialectExecutionResult.ContinueTo(next);
         }
     }

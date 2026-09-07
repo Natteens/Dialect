@@ -4,7 +4,9 @@ Create **Dialect > Dialogue Graph** from the Assets menu. The Project-window cre
 
 Use Dialogue for a line that waits for `Advance`. Its Speaker and Line fields are edited directly inside the node: **Inline** is plain text and **Localized** is a String Table/entry picker. A connected value wire overrides the authored default while preserving it for later disconnection. Speaker is optional; Line is required by strict validation.
 
-Choice presents the same inline/localized text authoring beside each numbered target. **+ Add** appends an option and **Remove Last** removes only the final option, preserving the meaning of all earlier connections. Branch routes a bool, Random Branch chooses one of N outputs using the Director's deterministic session seed, and Set Variable changes a local or shared value only in the current session. Condition and Action use reusable ScriptableObject behavior.
+Choice presents the same inline/localized text authoring beside each numbered target. **+ Add** appends an option and **Remove Last** removes only the final option, preserving the meaning of all earlier connections. Branch routes a bool, Random Branch chooses one of N outputs using the Director's deterministic session seed, and Wait nodes suspend without changing the iterative execution core. Wait and Wait Until resume automatically; Wait For Resume continues only after consumer code calls `Resume`.
+
+Set Variable assigns a local or shared session value. Modify Variable adds, subtracts, or multiplies numeric values, toggles Boolean values, and appends strings. Compare exposes only operators meaningful for its selected type, and Select chooses one of two typed values without duplicating flow nodes. Condition and Action use reusable ScriptableObject behavior.
 
 The graph toolbar provides:
 

@@ -1,5 +1,6 @@
 using System;
 using Dialect.Blackboards;
+using Dialect.Nodes;
 using Dialect.Values;
 using Unity.GraphToolkit.Editor;
 using UnityEngine;
@@ -12,6 +13,23 @@ namespace Dialect.Editor.Nodes
         [SerializeField] int count;
         public DialectPortCount(int count) => this.count = count;
         public int Count => Math.Clamp(count, 1, 8);
+    }
+
+    [Serializable]
+    public struct DialectCompareSettings
+    {
+        [SerializeField] DialectCompareType type;
+        [SerializeField] DialectComparisonOperator comparisonOperator;
+
+        public DialectCompareSettings(DialectCompareType type, DialectComparisonOperator comparisonOperator)
+        {
+            this.type = type;
+            this.comparisonOperator = CompareValueResolver.Normalize(type, comparisonOperator);
+        }
+
+        public DialectCompareType Type => type;
+        public DialectComparisonOperator Operator => CompareValueResolver.Normalize(type, comparisonOperator);
+        internal DialectComparisonOperator RawOperator => comparisonOperator;
     }
 
     public enum DialectVariableScope { Local, Shared }
@@ -70,5 +88,22 @@ namespace Dialect.Editor.Nodes
             valueType = DialectValueType.String;
             return false;
         }
+    }
+
+    [Serializable]
+    public struct DialectModifySettings
+    {
+        [SerializeField] DialectVariableTarget target;
+        [SerializeField] DialectNumericOperation numericOperation;
+
+        public DialectModifySettings(DialectVariableTarget target,
+            DialectNumericOperation numericOperation = DialectNumericOperation.Add)
+        {
+            this.target = target;
+            this.numericOperation = numericOperation;
+        }
+
+        public DialectVariableTarget Target => target;
+        public DialectNumericOperation NumericOperation => numericOperation;
     }
 }

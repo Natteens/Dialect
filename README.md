@@ -11,7 +11,7 @@ Graph Toolkit ships with Unity 6000.6, so Dialect does not declare an old experi
 
 ## Features
 
-- `.dlg` graphs with Start, Dialogue, Choice, Branch, Random Branch, Condition, Action, Set Variable, and End
+- `.dlg` graphs with focused Dialogue, Flow, Logic, and typed Value nodes
 - local Graph Toolkit variables and reusable `DialectBlackboard` assets
 - string, `LocalizedString`, bool, int, float, and Unity Object values
 - inline, localized, local, shared, constant, and custom connected typed values
@@ -21,7 +21,7 @@ Graph Toolkit ships with Unity 6000.6, so Dialect does not declare an old experi
 - quiet live structural diagnostics plus explicit strict validation
 - Validate, Shared Boards, and Runtime Debug graph toolbar controls
 - state-replayed current-node, traversed-wire, and compact port-value visualization
-- a Play Mode Director Inspector and a complete UI Toolkit sample
+- a Play Mode Director Inspector while presentation remains entirely consumer-owned
 
 ## Installation
 
@@ -60,7 +60,7 @@ Dialogue and Choice text refresh when the selected locale changes. Refreshing re
 
 External Editor assemblies can derive `DialectNode` or `DialectValueNode` and implement the matching compiler interface. Runtime assemblies provide serializable `RuntimeNode` and `DialectValueResolver` implementations. The importer discovers these contracts without changes to Dialect.
 
-During Play Mode, select the Director for valid playback controls or open its active graph to see runtime visualization. See the [manual](Documentation~/index.md), [API guide](Documentation~/api.md), [custom-node guide](Documentation~/custom-nodes.md), and [samples](Documentation~/samples.md).
+During Play Mode, select the Director for valid playback controls or open its active graph to see runtime visualization. See the [manual](Documentation~/index.md), [API guide](Documentation~/api.md), and [custom-node guide](Documentation~/custom-nodes.md).
 
 ## License
 
