@@ -158,6 +158,12 @@ namespace Dialect.Editor
         {
             if (type == typeof(string) && variable.TryGetDefaultValue(out string text)) { value = new DialectStringValue(text); return true; }
             if (type == typeof(LocalizedString) && variable.TryGetDefaultValue(out LocalizedString localized)) { value = new DialectLocalizedStringValue(localized); return true; }
+            // A Text variable is authored as DialectText but is stored, wired and resolved as the plain string or LocalizedString it holds.
+            if (type == typeof(DialectText) && variable.TryGetDefaultValue(out DialectText authored))
+            {
+                if (authored.Source == DialectTextSource.Localized) { value = new DialectLocalizedStringValue(authored.LocalizedValue); return true; }
+                if (authored.Source == DialectTextSource.Inline) { value = new DialectStringValue(authored.InlineValue ?? string.Empty); return true; }
+            }
             if (type == typeof(bool) && variable.TryGetDefaultValue(out bool boolean)) { value = new DialectBoolValue(boolean); return true; }
             if (type == typeof(int) && variable.TryGetDefaultValue(out int integer)) { value = new DialectIntValue(integer); return true; }
             if (type == typeof(float) && variable.TryGetDefaultValue(out float number)) { value = new DialectFloatValue(number); return true; }
