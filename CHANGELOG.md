@@ -1,3 +1,10 @@
+## [0.6.1](https://github.com/Natteens/Dialect/compare/v0.6.0...v0.6.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **editor:** compile Text (DialectText) graph variables ([f6007a2](https://github.com/Natteens/Dialect/commit/f6007a240408010e4b211b1cf4e3af538bf328db))
+
 # [0.6.0](https://github.com/Natteens/Dialect/compare/v0.5.0...v0.6.0) (2026-09-07)
 
 
